@@ -4,7 +4,7 @@ Este projeto é um script em Python3 que automatiza o processo de migração de 
 
 ## Instalação
 
-Passo 1: Baixar o script no repositório git
+**Passo 1:** Baixar o script no repositório git
 
 Você pode baixar o script executando o seguinte comando no terminal:
 
@@ -12,7 +12,7 @@ Você pode baixar o script executando o seguinte comando no terminal:
 git clone git@gitlab.com:cesarasilva/sync_imap_email.git
 ```
 
-Passo 2: Instalar e atualizar as dependências
+**Passo 2:** Instalar e atualizar as dependências
 
 Antes de executar o script, é necessário instalar e atualizar as dependências, incluindo o Python e o pacote "chardet". Você pode fazer isso executando o seguinte comando no terminal:
 
@@ -26,10 +26,10 @@ Depois de seguir esses passos, o script deve ser executado sem problemas e reali
 
 Siga os seguintes passos para utilizar este script:
 
-Passo 1: Configurar as credenciais
+**Passo 1:** Configurar as credenciais
 Você precisa configurar as credenciais dos e-mails. Para fazer isso, copie o arquivo "credentials.json.default" para um novo arquivo chamado "credentials.json" e adicione as credenciais dos e-mails.
 
-Passo 2: Executar o script
+**Passo 2:** Executar o script
 Finalmente, você pode executar o script "sync_imap_email.py" usando o seguinte comando no terminal:
 
 ```bash
