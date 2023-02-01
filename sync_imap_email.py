@@ -54,7 +54,7 @@ def migrate_emails(json):
         log_print(f"\nError Message: \"{e}\"")
         sys.exit()
 
-    # Authenticate a connection to the destination IMAP server
+    # Authenticate a connection to the source IMAP server
     try:
         log_print("Autenticando a conexão no servidor de origem...")
         src_mail.login(json["src"]["user"], json["src"]["password"])
@@ -63,7 +63,7 @@ def migrate_emails(json):
         log_print(f"\nError Message: \"{e}\"\n")
         sys.exit()
 
-    # Connect to source IMAP server
+    # Connect to destination IMAP server
     try:
         log_print("Conectando no servidor de destino...")
         dst_mail = imap_security(json["dst"]["security"], json["dst"]["server"], json["dst"]["port"])
@@ -166,13 +166,15 @@ def migrate_emails(json):
                             src_result, src_data = src_mail.fetch(src_msg, "(RFC822)")
                             if src_result == "OK":
 
+                                # Get the date the original message was received
+                                msg = email.message_from_bytes(src_data[0][1])
+                                received_datetime = parsedate_to_datetime(msg["Date"])
+                                received_timestamp = time.mktime(received_datetime.timetuple())
+                                received_date = imaplib.Time2Internaldate(received_timestamp)
+
                                 # Append the source message to the destination mailbox
                                 try:
                                     log_print(f"Copiando mensagem de {mailbox_name2} para o servidor de destino...")
-                                    msg = email.message_from_bytes(src_data[0][1])
-                                    received_datetime = parsedate_to_datetime(msg["Date"])
-                                    received_timestamp = time.mktime(received_datetime.timetuple())
-                                    received_date = imaplib.Time2Internaldate(received_timestamp)
                                     dst_result, dst_data = dst_mail.append(mailbox_name, None, received_date, src_data[0][1])
                                     if dst_result != "OK":
                                         log_print(f"Erro ao tentar copiar a mensagem de {mailbox_name2} para o servidor de destino.")
