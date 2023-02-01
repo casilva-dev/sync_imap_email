@@ -51,7 +51,7 @@ def migrate_emails(json):
     except ConnectionRefusedError as e:
         log_print("\nErro na conexão no servidor de origem.\nVerifique se a configuração do e-mail está correta:")
         log_print(json["src"], pprint.pprint)
-        log_print(f"\nError Message: \"{e}\"")
+        log_print("\nExcept error: \"{}\"".format(e))
         sys.exit()
 
     # Authenticate a connection to the source IMAP server
@@ -60,7 +60,7 @@ def migrate_emails(json):
         src_mail.login(json["src"]["user"], json["src"]["password"])
     except imaplib.IMAP4.error as e:
         log_print("\nErro na autenticação no servidor de origem.\nVerifique se o usuário/e-mail e senha estão corretas.")
-        log_print(f"\nError Message: \"{e}\"\n")
+        log_print("\nExcept error: \"{}\"".format(e))
         sys.exit()
 
     # Connect to destination IMAP server
@@ -79,7 +79,7 @@ def migrate_emails(json):
         dst_mail.login(json["dst"]["user"], json["dst"]["password"])
     except imaplib.IMAP4.error as e:
         log_print("\nErro na autenticação no servidor de destino.\nVerifique se o usuário/e-mail e senha estão corretas.")
-        log_print(f"\nError Message: \"{e}\"\n")
+        log_print("\nExcept error: \"{}\"".format(e))
         src_mail.logout()
         sys.exit()
 
@@ -89,7 +89,7 @@ def migrate_emails(json):
         src_mailboxes = src_mail.list()
     except imaplib.IMAP4.error as e:
         log_print("\nErro ao tentar obter a lista de pastas no servidor de origem.")
-        log_print(f"\nError Message: \"{e}\"\n")
+        log_print("\nExcept error: \"{}\"".format(e))
         src_mail.logout()
         dst_mail.logout()
         sys.exit()
@@ -105,7 +105,7 @@ def migrate_emails(json):
                 mailbox_name2 = mailbox_name.decode().strip()
             except TypeError as e:
                 log_print("\nErro ao tentar obter o nome da pasta no servidor de origem.")
-                log_print(f"\nError Message: \"{e}\"\n")
+                log_print("\nExcept error: \"{}\"".format(e))
                 src_mail.logout()
                 dst_mail.logout()
                 return
@@ -115,7 +115,7 @@ def migrate_emails(json):
                 src_mail.select(mailbox_name)
             except imaplib.IMAP4.error as e:
                 log_print(f"\nErro ao tentar selecionar a pasta {mailbox_name2} no servidor de origem.")
-                log_print(f"\nError Message: \"{e}\"\n")
+                log_print("\nExcept error: \"{}\"".format(e))
                 src_mail.logout()
                 dst_mail.logout()
                 return
@@ -132,7 +132,7 @@ def migrate_emails(json):
                     dst_mail.select(mailbox_name)
                 except imaplib.IMAP4.error as e:
                     log_print(f"\nErro ao tentar criar/selecionar a pasta {mailbox_name2} no servidor de destino.")
-                    log_print(f"\nError Message: \"{e}\"\n")
+                    log_print("\nExcept error: \"{}\"".format(e))
                     src_mail.logout()
                     dst_mail.logout()
                     sys.exit()
@@ -144,7 +144,7 @@ def migrate_emails(json):
                         src_result, src_data = src_mail.fetch(src_msg, "(BODY[HEADER])")
                     except imaplib.IMAP4.error as e:
                         log_print(f"Erro ao tentar obter o cabeçalho do e-mail no servidor de origem.")
-                        log_print(f"\nError Message: \"{e}\"\n")
+                        log_print("\nExcept error: \"{}\"".format(e))
                         src_mail.logout()
                         dst_mail.logout()
                         sys.exit()
@@ -182,7 +182,7 @@ def migrate_emails(json):
                                         return
                                 except imaplib.IMAP4.error as e:
                                     log_print(f"Erro ao tentar copiar a mensagem de {mailbox_name2} para o servidor de destino.")
-                                    log_print(f"\nError Message: \"{e}\"\n")
+                                    log_print("\nExcept error: \"{}\"".format(e))
                                     src_mail.logout()
                                     dst_mail.logout()
                                     return
