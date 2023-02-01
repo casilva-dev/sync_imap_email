@@ -27,9 +27,11 @@ Depois de seguir esses passos, o script deve ser executado sem problemas e reali
 Siga os seguintes passos para utilizar este script:
 
 **Passo 1:** Configurar as credenciais
+
 Você precisa configurar as credenciais dos e-mails. Para fazer isso, copie o arquivo "credentials.json.default" para um novo arquivo chamado "credentials.json" e adicione as credenciais dos e-mails.
 
 **Passo 2:** Executar o script
+
 Finalmente, você pode executar o script "sync_imap_email.py" usando o seguinte comando no terminal:
 
 ```bash
