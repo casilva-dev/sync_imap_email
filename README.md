@@ -9,7 +9,7 @@ Este projeto é um script em Python3 que automatiza o processo de migração de 
 Você pode baixar o script executando o seguinte comando no terminal:
 
 ```bash
-git clone git@gitlab.com:cesarasilva/sync_imap_email.git
+git clone https://gitlab.com/cesarasilva/sync_imap_email.git
 ```
 
 **Passo 2:** Instalar e atualizar as dependências
