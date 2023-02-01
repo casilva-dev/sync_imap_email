@@ -22,206 +22,216 @@
 #!/usr/bin/env python3
 import sys, re, json, chardet, imaplib, pprint, datetime
 
-# Creating log file name with current date
-now = datetime.datetime.now()
-log_filename = f"log_{now.strftime('%Y%m%d_%H%M%S')}.txt"
+class SyncImapEmail:
 
-def log_print(message, type = print):
-    type(message)
-    if type == pprint.pprint:
-        message = repr(message)
-    with open(log_filename, "a") as f:
-        f.write(f"{message}\r\n")
+    def __init__(self):
+        json_credentials = self.__load_credentials()
+        self.__log_start()
+        for credential in json_credentials:
+            self.__migrate(credential)
+            self.__disconnect()
+        self.__log_print("\nMigração do(s) e-mail(s) finalizado.")
+        self.__log_print("\nConfere no arquivo de log, se não houve nenhum erro durante o processo de migração.")
+        self.__log_print("Nome do arquivo: {}".format(self.__log_filename))
 
-def imap_security(type, host, port):
-    if type == "SSL":
-        rtn = imaplib.IMAP4_SSL(host, port)
-    else:
-        rtn = imaplib.IMAP4(host, port)
-        if type == "STARTTLS":
-            rtn.starttls()
-    return rtn
+    # Load JSON credentials file
+    def __load_credentials(self):
+        try:
+            with open("credentials.json", "r") as file:
+                json_credentials = json.load(file)
+        except FileNotFoundError:
+            self.__log_print("\nO arquivo credentials.json não foi encontrado.")
+            self.__log_print("Copie o credentials.json.default, renomeie para credentials.json e define as credenciais.")
+            sys.exit()
+        return json_credentials
 
-def migrate_emails(json):
-    # Connect to source IMAP server
-    try:
-        log_print("Conectando no servidor de origem...")
-        src_mail = imap_security(json["src"]["security"], json["src"]["server"], json["src"]["port"])
-    except ConnectionRefusedError as e:
-        log_print("\nErro na conexão no servidor de origem.\nVerifique se a configuração do e-mail está correta:")
-        log_print(json["src"], pprint.pprint)
-        log_print("\nExcept error: \"{}\"".format(e))
-        sys.exit()
+    # Create log file name with current date
+    def __log_start(self):
+        now = datetime.datetime.now()
+        self.__log_filename = f"log_{now.strftime('%Y%m%d_%H%M%S')}.txt"
 
-    # Authenticate a connection to the source IMAP server
-    try:
-        log_print("Autenticando a conexão no servidor de origem...")
-        src_mail.login(json["src"]["user"], json["src"]["password"])
-    except imaplib.IMAP4.error as e:
-        log_print("\nErro na autenticação no servidor de origem.\nVerifique se o usuário/e-mail e senha estão corretas.")
-        log_print("\nExcept error: \"{}\"".format(e))
-        sys.exit()
+    # Print the values in sys.stdout and append to the log file
+    def __log_print(self, message, type = print):
+        type(message)
+        if type == pprint.pprint:
+            message = repr(message)
+        with open(self.__log_filename, "a") as f:
+            f.write(f"{message}\r\n")
 
-    # Connect to destination IMAP server
-    try:
-        log_print("Conectando no servidor de destino...")
-        dst_mail = imap_security(json["dst"]["security"], json["dst"]["server"], json["dst"]["port"])
-    except ConnectionRefusedError as e:
-        log_print("\nErro na conexão no servidor de destino.\nVerifique se a configuração do e-mail está correta:")
-        log_print(json["dst"], pprint.pprint)
-        log_print(f"Error Message: \"{e}\"")
-        sys.exit()
+    # Instantiate the IMAP connection class according to the security type
+    def __imap_security(self, type, host, port):
+        if type == "SSL":
+            rtn = imaplib.IMAP4_SSL(host, port)
+        else:
+            rtn = imaplib.IMAP4(host, port)
+            if type == "STARTTLS":
+                rtn.starttls()
+        return rtn
 
-    # Authenticate a connection to the destination IMAP server
-    try:
-        log_print("Autenticando no servidor de destino...")
-        dst_mail.login(json["dst"]["user"], json["dst"]["password"])
-    except imaplib.IMAP4.error as e:
-        log_print("\nErro na autenticação no servidor de destino.\nVerifique se o usuário/e-mail e senha estão corretas.")
-        log_print("\nExcept error: \"{}\"".format(e))
-        src_mail.logout()
-        sys.exit()
+    # Connects and authenticates source and destination IMAP servers
+    def __connect(self, cfg):
+        # Connect to source IMAP server
+        try:
+            self.__log_print("Conectando no servidor de origem...")
+            self.__src_mail = self.__imap_security(cfg["src"]["security"], cfg["src"]["server"], cfg["src"]["port"])
+        except ConnectionRefusedError as e:
+            self.__log_print("\nErro na conexão no servidor de origem.\nVerifique se a configuração do e-mail está correta:")
+            self.__log_print(cfg["src"], pprint.pprint)
+            self.__log_print("\nExcept error: \"{}\"".format(e))
+            return False
 
-    # Get all source mailboxes
-    try:
-        log_print("Obtendo a lista de pastas do servidor de origem...")
-        src_mailboxes = src_mail.list()
-    except imaplib.IMAP4.error as e:
-        log_print("\nErro ao tentar obter a lista de pastas no servidor de origem.")
-        log_print("\nExcept error: \"{}\"".format(e))
-        src_mail.logout()
-        dst_mail.logout()
-        sys.exit()
+        # Authenticate a connection to the source IMAP server
+        try:
+            self.__log_print("Autenticando a conexão no servidor de origem...")
+            self.__src_mail.login(cfg["src"]["user"], cfg["src"]["password"])
+        except imaplib.IMAP4.error as e:
+            self.__log_print("\nErro na autenticação no servidor de origem.\nVerifique se o usuário/e-mail e senha estão corretas.")
+            self.__log_print("\nExcept error: \"{}\"".format(e))
+            return False
 
-    if src_mailboxes[0] == "OK":
+        # Connect to destination IMAP server
+        try:
+            self.__log_print("Conectando no servidor de destino...")
+            self.__dst_mail = self.__imap_security(cfg["dst"]["security"], cfg["dst"]["server"], cfg["dst"]["port"])
+        except ConnectionRefusedError as e:
+            self.__log_print("\nErro na conexão no servidor de destino.\nVerifique se a configuração do e-mail está correta:")
+            self.__log_print(cfg["dst"], pprint.pprint)
+            self.__log_print("\nExcept error: \"{}\"".format(e))
+            return False
 
-        # Loop through all source mailboxes
-        for mailbox in src_mailboxes[1]:
-            # Get the mailbox name and select it
-            try:
-                log_print("Obtendo o nome da pasta do servidor de origem...")
-                mailbox_name = mailbox.split(b'"."')[-1].strip(b'"')
-                mailbox_name2 = mailbox_name.decode().strip()
-            except TypeError as e:
-                log_print("\nErro ao tentar obter o nome da pasta no servidor de origem.")
-                log_print("\nExcept error: \"{}\"".format(e))
-                src_mail.logout()
-                dst_mail.logout()
-                return
+        # Authenticate a connection to the destination IMAP server
+        try:
+            self.__log_print("Autenticando no servidor de destino...")
+            self.__dst_mail.login(cfg["dst"]["user"], cfg["dst"]["password"])
+        except imaplib.IMAP4.error as e:
+            self.__log_print("\nErro na autenticação no servidor de destino.\nVerifique se o usuário/e-mail e senha estão corretas.")
+            self.__log_print("\nExcept error: \"{}\"".format(e))
+            return False
 
-            try:
-                log_print(f"Selecionando a pasta {mailbox_name2} do servidor de origem...")
-                src_mail.select(mailbox_name)
-            except imaplib.IMAP4.error as e:
-                log_print(f"\nErro ao tentar selecionar a pasta {mailbox_name2} no servidor de origem.")
-                log_print("\nExcept error: \"{}\"".format(e))
-                src_mail.logout()
-                dst_mail.logout()
-                return
+        return True
 
-            # Get all messages in the source mailbox
-            src_result, src_data = src_mail.search(None, "ALL")
-            if src_data[0]:
-                src_msgs = src_data[0].split(b' ')
+    # Closing the session and logging out
+    def __disconnect(self):
+        if hasattr(self, '_SyncImapEmail__src_mail'):
+            if self.__src_mail.state == 'SELECTED':
+                self.__src_mail.close()
+            self.__src_mail.logout()
+        if hasattr(self, '_SyncImapEmail__dst_mail'):
+            if self.__dst_mail.state == 'SELECTED':
+                self.__dst_mail.close()
+            self.__dst_mail.logout()
 
-                # Create the same mailbox on the destination server
+    # Migrate all folders along with messages from source email to destination
+    def __migrate(self, json):
+        self.__log_print(f"\nIniciando a migração do e-mail <{json['src']['user']}>...")
+        if (not self.__connect(json)):
+            return
+
+        # Get all source mailboxes
+        try:
+            self.__log_print("Obtendo a lista de pastas do servidor de origem...")
+            src_mailboxes = self.__src_mail.list()
+        except imaplib.IMAP4.error as e:
+            self.__log_print("\nErro ao tentar obter a lista de pastas no servidor de origem.")
+            self.__log_print("\nExcept error: \"{}\"".format(e))
+            return
+
+        if src_mailboxes[0] == "OK":
+
+            # Loop through all source mailboxes
+            for mailbox in src_mailboxes[1]:
+                # Get the mailbox name and select it
                 try:
-                    log_print(f"Criando a pasta {mailbox_name2} no servidor de destino, caso não exista...")
-                    dst_mail.create(mailbox_name)
-                    dst_mail.select(mailbox_name)
+                    self.__log_print("Obtendo o nome da pasta do servidor de origem...")
+                    mailbox_name = mailbox.split(b'"."')[-1].strip(b'"')
+                    mailbox_name2 = mailbox_name.decode().strip()
+                except TypeError as e:
+                    self.__log_print("\nErro ao tentar obter o nome da pasta no servidor de origem.")
+                    self.__log_print("\nExcept error: \"{}\"".format(e))
+                    continue
+
+                try:
+                    self.__log_print(f"Selecionando a pasta {mailbox_name2} do servidor de origem...")
+                    self.__src_mail.select(mailbox_name)
                 except imaplib.IMAP4.error as e:
-                    log_print(f"\nErro ao tentar criar/selecionar a pasta {mailbox_name2} no servidor de destino.")
-                    log_print("\nExcept error: \"{}\"".format(e))
-                    src_mail.logout()
-                    dst_mail.logout()
-                    sys.exit()
+                    self.__log_print(f"\nErro ao tentar selecionar a pasta {mailbox_name2} no servidor de origem.")
+                    self.__log_print("\nExcept error: \"{}\"".format(e))
+                    continue
 
-                # Loop through all messages in the source mailbox
-                for src_msg in src_msgs:
-                    # Fetch the message header
+                # Get all messages in the source mailbox
+                src_result, src_data = self.__src_mail.search(None, "ALL")
+                if src_data[0]:
+                    src_msgs = src_data[0].split(b' ')
+
+                    # Create the same mailbox on the destination server
                     try:
-                        src_result, src_data = src_mail.fetch(src_msg, "(BODY[HEADER])")
+                        self.__log_print(f"Criando a pasta {mailbox_name2} no servidor de destino, caso não exista...")
+                        self.__dst_mail.create(mailbox_name)
+                        self.__dst_mail.select(mailbox_name)
                     except imaplib.IMAP4.error as e:
-                        log_print(f"Erro ao tentar obter o cabeçalho do e-mail no servidor de origem.")
-                        log_print("\nExcept error: \"{}\"".format(e))
-                        src_mail.logout()
-                        dst_mail.logout()
-                        sys.exit()
+                        self.__log_print(f"\nErro ao tentar criar/selecionar a pasta {mailbox_name2} no servidor de destino.")
+                        self.__log_print("\nExcept error: \"{}\"".format(e))
+                        continue
 
-                    # Extract the Message-ID from the header
-                    encoding = chardet.detect(src_data[0][1])['encoding']
-                    header = src_data[0][1].decode(encoding)
-                    pattern = r"message-id:[\r\n\s]*\<?([a-z0-9_.%=+-]+@[a-z0-9_.%=+-]+)\>?"
-                    message_id = re.search(pattern, header.lower(), re.IGNORECASE)
+                    # Loop through all messages in the source mailbox
+                    for src_msg in src_msgs:
+                        # Fetch the message header
+                        try:
+                            src_result, src_data = self.__src_mail.fetch(src_msg, "(BODY[HEADER])")
+                        except imaplib.IMAP4.error as e:
+                            self.__log_print(f"Erro ao tentar obter o cabeçalho da mensagem no servidor de origem.")
+                            self.__log_print("\nExcept error: \"{}\"".format(e))
+                            continue
 
-                    if message_id:
-                        message_id = message_id.group(1)
-                        log_print(f"\nMessage-ID: <{message_id}>")
+                        # Extract the Message-ID from the header
+                        encoding = chardet.detect(src_data[0][1])['encoding']
+                        header = src_data[0][1].decode(encoding)
+                        pattern = r"message-id:[\r\n\s]*\<?([a-z0-9_.%=+-]+@[a-z0-9_.%=+-]+)\>?"
+                        message_id = re.search(pattern, header.lower(), re.IGNORECASE)
 
-                        # Use the Message-ID to check if the message already exists in the destination mailbox
-                        dst_result, dst_data = dst_mail.search(None, "HEADER Message-ID <{}>".format(message_id))
-                        if not dst_data[0]:
-                            # Fetch the source message
-                            src_result, src_data = src_mail.fetch(src_msg, "(RFC822)")
-                            if src_result == "OK":
+                        if message_id:
+                            message_id = message_id.group(1)
+                            self.__log_print(f"\nMessage-ID: <{message_id}>")
 
-                                # Get the date the original message was received
-                                pattern = r"[^-]date: (\w{3}, \d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2} [-+]\d{4})"
-                                date_msg = re.search(pattern, header.lower(), re.IGNORECASE)
-                                if date_msg:
-                                    date_obj = datetime.datetime.strptime(date_msg.group(1), "%a, %d %b %Y %H:%M:%S %z")
-                                    date_str = date_obj.strftime("%d-%b-%Y %H:%M:%S %z")
-                                    received_date = '"{}"'.format(date_str)
+                            # Use the Message-ID to check if the message already exists in the destination mailbox
+                            dst_result, dst_data = self.__dst_mail.search(None, "HEADER Message-ID <{}>".format(message_id))
+                            if not dst_data[0]:
+                                # Fetch the source message
+                                src_result, src_data = self.__src_mail.fetch(src_msg, "(RFC822)")
+                                if src_result == "OK":
+                                    # Get the date the original message was received
+                                    pattern = r"[^-]date: (\w{3}, \d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2} [-+]\d{4})"
+                                    date_msg = re.search(pattern, header.lower(), re.IGNORECASE)
+                                    if date_msg:
+                                        date_obj = datetime.datetime.strptime(date_msg.group(1), "%a, %d %b %Y %H:%M:%S %z")
+                                        date_str = date_obj.strftime("%d-%b-%Y %H:%M:%S %z")
+                                        received_date = '"{}"'.format(date_str)
+                                    else:
+                                        received_date = None
+
+                                    # Append the source message to the destination mailbox
+                                    try:
+                                        self.__log_print(f"Copiando mensagem de {mailbox_name2} para o servidor de destino...")
+                                        dst_result, dst_data = self.__dst_mail.append(mailbox_name, None, received_date, src_data[0][1])
+                                        if dst_result != "OK":
+                                            self.__log_print(f"Erro ao tentar copiar a mensagem de {mailbox_name2} para o servidor de destino.")
+                                            self.__log_print(f"dst_result: {dst_result}\ndst_data: {dst_data}")
+                                    except imaplib.IMAP4.error as e:
+                                        self.__log_print(f"Erro ao tentar copiar a mensagem de {mailbox_name2} para o servidor de destino.")
+                                        self.__log_print("\nExcept error: \"{}\"".format(e))
                                 else:
-                                    received_date = None
-
-                                # Append the source message to the destination mailbox
-                                try:
-                                    log_print(f"Copiando mensagem de {mailbox_name2} para o servidor de destino...")
-                                    dst_result, dst_data = dst_mail.append(mailbox_name, None, received_date, src_data[0][1])
-                                    if dst_result != "OK":
-                                        log_print(f"Erro ao tentar copiar a mensagem de {mailbox_name2} para o servidor de destino.")
-                                        log_print(f"dst_result: {dst_result}\ndst_data: {dst_data}")
-                                        return
-                                except imaplib.IMAP4.error as e:
-                                    log_print(f"Erro ao tentar copiar a mensagem de {mailbox_name2} para o servidor de destino.")
-                                    log_print("\nExcept error: \"{}\"".format(e))
-                                    src_mail.logout()
-                                    dst_mail.logout()
-                                    return
+                                    self.__log_print(f"Erro ao tentar buscar a mensagem de {mailbox_name2} do servidor de origem.")
+                                    self.__log_print(f"src_result: {src_result}\nsrc_data: {src_data}")
                             else:
-                                log_print(f"Erro ao tentar buscar a mensagem de {mailbox_name2} do servidor de origem.")
-                                log_print(f"src_result: {src_result}\nsrc_data: {src_data}")
-                                return
+                                self.__log_print(f"Mensagem já existe em {mailbox_name2} no servidor de destino.")
                         else:
-                            log_print(f"Mensagem já existe em {mailbox_name2} no servidor de destino.")
-                    else:
-                        log_print("Message-ID não encontrado no cabeçalho.")
-                        log_print(f"header: {header}")
-                        return
-            else:
-                log_print(f"A pasta {mailbox_name2} está vazia.")
+                            self.__log_print("Message-ID não encontrado no cabeçalho.")
+                            self.__log_print(f"header: {header}")
+                else:
+                    self.__log_print(f"A pasta {mailbox_name2} está vazia no servidor de origem.")
+            self.__log_print(f"\nFinalizado a migração do e-mail <{json['src']['user']}>.")
+        else:
+            self.__log_print("\nErro ao tentar obter a lista de pastas no servidor de origem.")
+            self.__log_print("\nExcept error: \"{}\"".format(src_mailboxes))
 
-        # Close both IMAP connections
-        src_mail.close()
-        src_mail.logout()
-        dst_mail.close()
-        dst_mail.logout()
-    
-    else:
-        log_print("Erro na conexão.")
-
-# Load JSON credentials file
-try:
-    with open("credentials.json", "r") as file:
-        json_credentials = json.load(file)
-except FileNotFoundError:
-    log_print("\nO arquivo credentials.json não foi encontrado.")
-    log_print("Copie o credentials.json.default, renomeie para credentials.json e define as credenciais.")
-    sys.exit()
-
-for credential in json_credentials:
-    log_print(f"\nIniciando a migração do e-mail <{credential['src']['user']}>...")
-    migrate_emails(credential)
-    log_print(f"\nFinalizado a migração do e-mail <{credential['src']['user']}>.")
-log_print("\nMigração do(s) e-mail(s) finalizado.")
+SyncImapEmail()
