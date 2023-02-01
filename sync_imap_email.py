@@ -1,3 +1,24 @@
+# sync_imap_email.py
+#
+# Copyright (C) 2023 Cesar Augustus Silva
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# The objective of this script is to copy all the messages from one email
+# to another, facilitating the migration of emails from one server/hosting
+# to another in a simple way.
+
 #!/usr/bin/env python3
 from email.utils import parsedate_to_datetime
 import sys, re, json, chardet, imaplib, pprint, time, datetime, email
@@ -31,7 +52,7 @@ def migrate_emails(json):
         log_print("\nErro na conexão no servidor de origem.\nVerifique se a configuração do e-mail está correta:")
         log_print(json["src"], pprint.pprint)
         log_print(f"\nError Message: \"{e}\"")
-        return
+        sys.exit()
 
     # Authenticate a connection to the destination IMAP server
     try:
@@ -40,7 +61,7 @@ def migrate_emails(json):
     except imaplib.IMAP4.error as e:
         log_print("\nErro na autenticação no servidor de origem.\nVerifique se o usuário/e-mail e senha estão corretas.")
         log_print(f"\nError Message: \"{e}\"\n")
-        return
+        sys.exit()
 
     # Connect to source IMAP server
     try:
@@ -50,7 +71,7 @@ def migrate_emails(json):
         log_print("\nErro na conexão no servidor de destino.\nVerifique se a configuração do e-mail está correta:")
         log_print(json["dst"], pprint.pprint)
         log_print(f"Error Message: \"{e}\"")
-        return
+        sys.exit()
 
     # Authenticate a connection to the destination IMAP server
     try:
@@ -60,7 +81,7 @@ def migrate_emails(json):
         log_print("\nErro na autenticação no servidor de destino.\nVerifique se o usuário/e-mail e senha estão corretas.")
         log_print(f"\nError Message: \"{e}\"\n")
         src_mail.logout()
-        return
+        sys.exit()
 
     # Get all source mailboxes
     try:
@@ -71,7 +92,7 @@ def migrate_emails(json):
         log_print(f"\nError Message: \"{e}\"\n")
         src_mail.logout()
         dst_mail.logout()
-        return
+        sys.exit()
 
     if src_mailboxes[0] == "OK":
 
@@ -114,7 +135,7 @@ def migrate_emails(json):
                     log_print(f"\nError Message: \"{e}\"\n")
                     src_mail.logout()
                     dst_mail.logout()
-                    return
+                    sys.exit()
 
                 # Loop through all messages in the source mailbox
                 for src_msg in src_msgs:
@@ -126,7 +147,7 @@ def migrate_emails(json):
                         log_print(f"\nError Message: \"{e}\"\n")
                         src_mail.logout()
                         dst_mail.logout()
-                        return
+                        sys.exit()
 
                     # Extract the Message-ID from the header
                     encoding = chardet.detect(src_data[0][1])['encoding']
@@ -153,11 +174,10 @@ def migrate_emails(json):
                                     received_timestamp = time.mktime(received_datetime.timetuple())
                                     received_date = imaplib.Time2Internaldate(received_timestamp)
                                     dst_result, dst_data = dst_mail.append(mailbox_name, None, received_date, src_data[0][1])
-                                    #                      dst_mail.append('INBOX', '', imaplib.Time2Internaldate(time.time()), data[0][1])
                                     if dst_result != "OK":
                                         log_print(f"Erro ao tentar copiar a mensagem de {mailbox_name2} para o servidor de destino.")
                                         log_print(f"dst_result: {dst_result}\ndst_data: {dst_data}")
-                                        sys.exit()
+                                        return
                                 except imaplib.IMAP4.error as e:
                                     log_print(f"Erro ao tentar copiar a mensagem de {mailbox_name2} para o servidor de destino.")
                                     log_print(f"\nError Message: \"{e}\"\n")
@@ -165,15 +185,15 @@ def migrate_emails(json):
                                     dst_mail.logout()
                                     return
                             else:
-                                log_print(f"Erro ao tentar buscar a mensagem de {mailbox_name2} para o servidor de origem.")
+                                log_print(f"Erro ao tentar buscar a mensagem de {mailbox_name2} do servidor de origem.")
                                 log_print(f"src_result: {src_result}\nsrc_data: {src_data}")
-                                sys.exit()
+                                return
                         else:
                             log_print(f"Mensagem já existe em {mailbox_name2} no servidor de destino.")
                     else:
                         log_print("Message-ID não encontrado no cabeçalho.")
                         log_print(f"header: {header}")
-                        sys.exit()
+                        return
             else:
                 log_print(f"A pasta {mailbox_name2} está vazia.")
 
