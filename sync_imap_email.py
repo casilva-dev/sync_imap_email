@@ -20,7 +20,8 @@
 # to another in a simple way.
 
 #!/usr/bin/env python3
-import sys, re, json, chardet, imaplib, pprint, datetime
+from email.utils import parsedate_to_datetime
+import sys, re, json, chardet, imaplib, pprint, time, datetime, email
 
 class SyncImapEmail:
 
@@ -200,14 +201,10 @@ class SyncImapEmail:
                                 src_result, src_data = self.__src_mail.fetch(src_msg, "(RFC822)")
                                 if src_result == "OK":
                                     # Get the date the original message was received
-                                    pattern = r"[^-]date: (\w{3}, \d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2} [-+]\d{4})"
-                                    date_msg = re.search(pattern, header.lower(), re.IGNORECASE)
-                                    if date_msg:
-                                        date_obj = datetime.datetime.strptime(date_msg.group(1), "%a, %d %b %Y %H:%M:%S %z")
-                                        date_str = date_obj.strftime("%d-%b-%Y %H:%M:%S %z")
-                                        received_date = '"{}"'.format(date_str)
-                                    else:
-                                        received_date = None
+                                    msg = email.message_from_bytes(src_data[0][1])
+                                    received_datetime = parsedate_to_datetime(msg["Date"])
+                                    received_timestamp = time.mktime(received_datetime.timetuple())
+                                    received_date = imaplib.Time2Internaldate(received_timestamp)
 
                                     # Append the source message to the destination mailbox
                                     try:
