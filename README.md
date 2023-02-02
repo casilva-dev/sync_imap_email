@@ -1,4 +1,8 @@
+![Sync Email Image](https://cdn-icons-png.flaticon.com/128/9197/9197904.png)
 # SyncImapEmail
+
+[![Python 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-green.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 Este projeto é um script em Python3 que automatiza o processo de migração de mensagens de e-mail. Ele copia todas as mensagens de um determinado e-mail e as cola em outro, facilitando significativamente a tarefa de transferir uma ou mais contas de e-mail de um servidor/hospedagem para outro. Com este script, a migração é realizada de forma rápida, simples e eficiente.
 
@@ -45,14 +49,14 @@ O script pode ser utilizado de duas formas diferentes:
 
 1. **Docker**
 
-    Inicie o Docker, caso não esteja aberto, e execute o seguinte comando:
+    Inicie o Docker, caso não esteja rodando, e execute o seguinte comando:
 
     ```bash
     docker build -t sync_imap_email .
     docker run --name my_container sync_imap_email
     ```
 
-    O docker iniciará o container para executar o script. Após o término da migração, irá exibir o nome do arquivo log gerado. Copie o arquivo log do container para a sua máquina local:
+    O Docker irá iniciar o container para executar o script. Após a conclusão da migração, o nome do arquivo de log será exibido. Copie o arquivo de log do container para o seu computador local.
 
     ```bash
     docker cp my_container:/log_20230202_030302.txt .
@@ -60,7 +64,7 @@ O script pode ser utilizado de duas formas diferentes:
 
 2. **Manual**
 
-    Para executar o script manualmente no terminal de sua máquina, será preciso instalar o pacote Python3.8 e as dependências.
+    Para rodar o script manualmente no terminal do seu computador, é necessário instalar o Python3.8 e suas dependências.
 
     - ***Linux:***
 
@@ -78,7 +82,7 @@ O script pode ser utilizado de duas formas diferentes:
     pip3 install chardet
     ```
 
-    Após a instalação dos pacotes, execute o script:
+    Após a instalação dos pacotes necessários, execute o script:
 
     ```bash
     python3 sync_imap_email.py
