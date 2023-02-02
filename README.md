@@ -43,7 +43,7 @@ Edite o arquivo "credencials.json" e adicione as credenciais dos e-mails:
 
 O script pode ser utilizado de duas formas diferentes:
 
-1. Docker
+1. **Docker**
 
     Inicie o Docker, caso não esteja aberto, e execute o seguinte comando:
 
@@ -58,11 +58,11 @@ O script pode ser utilizado de duas formas diferentes:
     docker cp my_container:/log_20230202_030302.txt .
     ```
 
-2. Manual
+2. **Manual**
 
-    Para executar manualmente no terminal de sua máquina, será preciso instalar o pacote Python3.8 e as dependências.
+    Para executar o script manualmente no terminal de sua máquina, será preciso instalar o pacote Python3.8 e as dependências.
 
-    - **Linux:**
+    - ***Linux:***
 
     ```bash
     sudo apt-get update
@@ -71,7 +71,7 @@ O script pode ser utilizado de duas formas diferentes:
     pip3 install chardet
     ```
 
-    - **MacOS:**
+    - ***MacOS:***
 
     ```zsh
     brew install python3
