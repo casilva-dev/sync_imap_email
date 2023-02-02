@@ -10,5 +10,5 @@ COPY sync_imap_email.py /
 # Copy the credentials.json file from the local machine to the container
 COPY credentials.json /
 
-# Run script.py with Python 3.8
+# Run sync_imap_email.py with Python 3.8
 CMD ["python3.8", "sync_imap_email.py"]
