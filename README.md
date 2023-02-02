@@ -2,41 +2,87 @@
 
 Este projeto é um script em Python3 que automatiza o processo de migração de mensagens de e-mail. Ele copia todas as mensagens de um determinado e-mail e as cola em outro, facilitando significativamente a tarefa de transferir uma ou mais contas de e-mail de um servidor/hospedagem para outro. Com este script, a migração é realizada de forma rápida, simples e eficiente.
 
-## Instalação
+## Como usar
 
-**Passo 1:** Baixar o script no repositório git
-
-Você pode baixar o script executando o seguinte comando no terminal:
+Baixe o SyncImapEmail no repositório Git:
 
 ```bash
 git clone https://gitlab.com/cesarasilva/sync_imap_email.git
 ```
 
-**Passo 2:** Instalar e atualizar as dependências
-
-Antes de executar o script, é necessário instalar e atualizar as dependências, incluindo o Python e o pacote "chardet". Você pode fazer isso executando o seguinte comando no terminal:
+Entre na pasta do projeto, copie o arquivo "credentials.json.default" para um novo arquivo chamado "credentials.json".
 
 ```bash
-pip3 install --upgrade python chardet
+cd sync_imap_email/
+cp credentials.json.default credencials.json
 ```
 
-Depois de seguir esses passos, o script deve ser executado sem problemas e realizar a migração de mensagens de e-mail como desejado.
+Edite o arquivo "credencials.json" e adicione as credenciais dos e-mails:
 
-## Como usar
-
-Siga os seguintes passos para utilizar este script:
-
-**Passo 1:** Configurar as credenciais
-
-Você precisa configurar as credenciais dos e-mails. Para fazer isso, copie o arquivo "credentials.json.default" para um novo arquivo chamado "credentials.json" e adicione as credenciais dos e-mails.
-
-**Passo 2:** Executar o script
-
-Finalmente, você pode executar o script "sync_imap_email.py" usando o seguinte comando no terminal:
-
-```bash
-python3 sync_imap_email.py
+```json
+[
+    {
+        "src": {
+            "user": "email@domain1-src.com",
+            "password": "password-src",
+            "server": "imap.domain1-src.com",
+            "port": 143,
+            "security": "TLS"
+        },
+        "dst": {
+            "user": "email@domain1-dst.com",
+            "password": "password-dst",
+            "server": "mail.domain1-dst.com",
+            "port": 993,
+            "security": "SSL"
+        }
+    },
+    ...
+]
 ```
+
+O script pode ser utilizado de duas formas diferentes:
+
+1. Docker
+
+    Inicie o Docker, caso não esteja aberto, e execute o seguinte comando:
+
+    ```bash
+    docker build -t sync_imap_email .
+    docker run --name my_container sync_imap_email
+    ```
+
+    O docker iniciará o container para executar o script. Após o término da migração, irá exibir o nome do arquivo log gerado. Copie o arquivo log do container para a sua máquina local:
+
+    ```bash
+    docker cp my_container:/log_20230202_030302.txt .
+    ```
+
+2. Manual
+
+    Para executar manualmente no terminal de sua máquina, será preciso instalar o pacote Python3.8 e as dependências.
+
+    - **Linux:**
+
+    ```bash
+    sudo apt-get update
+    sudo apt-get install python3.8
+    sudo apt-get install python3-pip
+    pip3 install chardet
+    ```
+
+    - **MacOS:**
+
+    ```zsh
+    brew install python3
+    pip3 install chardet
+    ```
+
+    Após a instalação dos pacotes, execute o script:
+
+    ```bash
+    python3 sync_imap_email.py
+    ```
 
 ## Contribuição
 
