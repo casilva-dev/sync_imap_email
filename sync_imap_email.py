@@ -214,6 +214,8 @@ class SyncImapEmail:
                                     except imaplib.IMAP4.error as e:
                                         self.__log_print(f"Erro ao tentar copiar a mensagem de {mailbox_name2} para o servidor de destino.")
                                         self.__log_print("\nExcept error: \"{}\"".format(e))
+
+                                    # Preserved original message flags when copying to target email
                                     flags = src_mail.fetch(src_msg, "(FLAGS)")[1][0]
                                     flags = re.findall(r'\\\w+', flags.decode())
                                     if flags:
