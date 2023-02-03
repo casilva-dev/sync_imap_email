@@ -30,9 +30,10 @@ class SyncImapEmail:
         self.__log_start()
         for credential in json_credentials:
             self.__log_print(f"\nIniciando a migração do e-mail <{credential['src']['user']}>...")
-            src_mail, dst_mail = self.__connect(credential)
-            if src_mail and dst_mail and self.__migrate(src_mail, dst_mail):
-                self.__log_print(f"\nFinalizado a migração do e-mail <{credential['src']['user']}>.")
+            conn_result, src_mail, dst_mail = self.__connect(credential)
+            if conn_result == "OK":
+                self.__migrate(src_mail, dst_mail)
+            self.__log_print(f"\nFinalizado a migração do e-mail <{credential['src']['user']}>.")
             self.__disconnect(src_mail, dst_mail)
         self.__log_print("\nMigração do(s) e-mail(s) finalizado.")
         self.__log_print("\nConfere no arquivo de log, se não houve nenhum erro durante o processo de migração.")
@@ -82,16 +83,16 @@ class SyncImapEmail:
             self.__log_print("\nErro na conexão no servidor de origem.\nVerifique se a configuração do e-mail está correta:")
             self.__log_print(credential["src"], pprint.pprint)
             self.__log_print("\nExcept error: \"{}\"".format(e))
-            return False, False
+            return "ERROR", None, None
 
         # Authenticate a connection to the source IMAP server
         try:
-            self.__log_print("Autenticando a conexão no servidor de origem...")
+            self.__log_print("Autenticando o usuário/e-mail e senha no servidor de origem...")
             src_mail.login(credential["src"]["user"], credential["src"]["password"])
         except imaplib.IMAP4.error as e:
             self.__log_print("\nErro na autenticação no servidor de origem.\nVerifique se o usuário/e-mail e senha estão corretas.")
             self.__log_print("\nExcept error: \"{}\"".format(e))
-            return src_mail, False
+            return "ERROR", src_mail, None
 
         # Connect to destination IMAP server
         try:
@@ -101,17 +102,18 @@ class SyncImapEmail:
             self.__log_print("\nErro na conexão no servidor de destino.\nVerifique se a configuração do e-mail está correta:")
             self.__log_print(credential["dst"], pprint.pprint)
             self.__log_print("\nExcept error: \"{}\"".format(e))
-            return src_mail, False
+            return "ERROR", src_mail, None
 
         # Authenticate a connection to the destination IMAP server
         try:
-            self.__log_print("Autenticando no servidor de destino...")
+            self.__log_print("Autenticando o usuário/e-mail e senha no servidor de destino...")
             dst_mail.login(credential["dst"]["user"], credential["dst"]["password"])
         except imaplib.IMAP4.error as e:
             self.__log_print("\nErro na autenticação no servidor de destino.\nVerifique se o usuário/e-mail e senha estão corretas.")
             self.__log_print("\nExcept error: \"{}\"".format(e))
+            return "ERROR", src_mail, dst_mail
 
-        return src_mail, dst_mail
+        return "OK", src_mail, dst_mail
 
     # Closing the session and logging out
     def __disconnect(self, src_mail, dst_mail):
@@ -232,7 +234,6 @@ class SyncImapEmail:
                             self.__log_print(f"header: {header}")
                 else:
                     self.__log_print(f"A pasta {mailbox_name2} está vazia no servidor de origem.")
-            return True
         else:
             self.__log_print("\nErro ao tentar obter a lista de pastas no servidor de origem.")
             self.__log_print("\nExcept error: \"{}\"".format(src_mailboxes))
