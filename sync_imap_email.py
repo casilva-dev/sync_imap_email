@@ -29,8 +29,11 @@ class SyncImapEmail:
         json_credentials = self.__load_credentials()
         self.__log_start()
         for credential in json_credentials:
-            self.__migrate(credential)
-            self.__disconnect()
+            self.__log_print(f"\nIniciando a migração do e-mail <{credential['src']['user']}>...")
+            src_mail, dst_mail = self.__connect(credential)
+            if src_mail and dst_mail and self.__migrate(src_mail, dst_mail):
+                self.__log_print(f"\nFinalizado a migração do e-mail <{credential['src']['user']}>.")
+            self.__disconnect(src_mail, dst_mail)
         self.__log_print("\nMigração do(s) e-mail(s) finalizado.")
         self.__log_print("\nConfere no arquivo de log, se não houve nenhum erro durante o processo de migração.")
         self.__log_print("Nome do arquivo: {}".format(self.__log_filename))
@@ -70,68 +73,63 @@ class SyncImapEmail:
         return rtn
 
     # Connects and authenticates source and destination IMAP servers
-    def __connect(self, cfg):
+    def __connect(self, credential):
         # Connect to source IMAP server
         try:
             self.__log_print("Conectando no servidor de origem...")
-            self.__src_mail = self.__imap_security(cfg["src"]["security"], cfg["src"]["server"], cfg["src"]["port"])
+            src_mail = self.__imap_security(credential["src"]["security"], credential["src"]["server"], credential["src"]["port"])
         except ConnectionRefusedError as e:
             self.__log_print("\nErro na conexão no servidor de origem.\nVerifique se a configuração do e-mail está correta:")
-            self.__log_print(cfg["src"], pprint.pprint)
+            self.__log_print(credential["src"], pprint.pprint)
             self.__log_print("\nExcept error: \"{}\"".format(e))
-            return False
+            return False, False
 
         # Authenticate a connection to the source IMAP server
         try:
             self.__log_print("Autenticando a conexão no servidor de origem...")
-            self.__src_mail.login(cfg["src"]["user"], cfg["src"]["password"])
+            src_mail.login(credential["src"]["user"], credential["src"]["password"])
         except imaplib.IMAP4.error as e:
             self.__log_print("\nErro na autenticação no servidor de origem.\nVerifique se o usuário/e-mail e senha estão corretas.")
             self.__log_print("\nExcept error: \"{}\"".format(e))
-            return False
+            return src_mail, False
 
         # Connect to destination IMAP server
         try:
             self.__log_print("Conectando no servidor de destino...")
-            self.__dst_mail = self.__imap_security(cfg["dst"]["security"], cfg["dst"]["server"], cfg["dst"]["port"])
+            dst_mail = self.__imap_security(credential["dst"]["security"], credential["dst"]["server"], credential["dst"]["port"])
         except ConnectionRefusedError as e:
             self.__log_print("\nErro na conexão no servidor de destino.\nVerifique se a configuração do e-mail está correta:")
-            self.__log_print(cfg["dst"], pprint.pprint)
+            self.__log_print(credential["dst"], pprint.pprint)
             self.__log_print("\nExcept error: \"{}\"".format(e))
-            return False
+            return src_mail, False
 
         # Authenticate a connection to the destination IMAP server
         try:
             self.__log_print("Autenticando no servidor de destino...")
-            self.__dst_mail.login(cfg["dst"]["user"], cfg["dst"]["password"])
+            dst_mail.login(credential["dst"]["user"], credential["dst"]["password"])
         except imaplib.IMAP4.error as e:
             self.__log_print("\nErro na autenticação no servidor de destino.\nVerifique se o usuário/e-mail e senha estão corretas.")
             self.__log_print("\nExcept error: \"{}\"".format(e))
-            return False
 
-        return True
+        return src_mail, dst_mail
 
     # Closing the session and logging out
-    def __disconnect(self):
-        if hasattr(self, '_SyncImapEmail__src_mail'):
-            if self.__src_mail.state == 'SELECTED':
-                self.__src_mail.close()
-            self.__src_mail.logout()
-        if hasattr(self, '_SyncImapEmail__dst_mail'):
-            if self.__dst_mail.state == 'SELECTED':
-                self.__dst_mail.close()
-            self.__dst_mail.logout()
+    def __disconnect(self, src_mail, dst_mail):
+        if src_mail:
+            if src_mail.state == 'SELECTED':
+                src_mail.close()
+            src_mail.logout()
+        if dst_mail:
+            if dst_mail.state == 'SELECTED':
+                dst_mail.close()
+            dst_mail.logout()
 
     # Migrate all folders along with messages from source email to destination
-    def __migrate(self, json):
-        self.__log_print(f"\nIniciando a migração do e-mail <{json['src']['user']}>...")
-        if (not self.__connect(json)):
-            return
-
+    def __migrate(self, src_mail, dst_mail):
         # Get all source mailboxes
         try:
             self.__log_print("Obtendo a lista de pastas do servidor de origem...")
-            src_mailboxes = self.__src_mail.list()
+            src_mailboxes = src_mail.list()
         except imaplib.IMAP4.error as e:
             self.__log_print("\nErro ao tentar obter a lista de pastas no servidor de origem.")
             self.__log_print("\nExcept error: \"{}\"".format(e))
@@ -153,22 +151,22 @@ class SyncImapEmail:
 
                 try:
                     self.__log_print(f"Selecionando a pasta {mailbox_name2} do servidor de origem...")
-                    self.__src_mail.select(mailbox_name)
+                    src_mail.select(mailbox_name)
                 except imaplib.IMAP4.error as e:
                     self.__log_print(f"\nErro ao tentar selecionar a pasta {mailbox_name2} no servidor de origem.")
                     self.__log_print("\nExcept error: \"{}\"".format(e))
                     continue
 
                 # Get all messages in the source mailbox
-                src_result, src_data = self.__src_mail.search(None, "ALL")
+                src_result, src_data = src_mail.search(None, "ALL")
                 if src_data[0]:
                     src_msgs = src_data[0].split(b' ')
 
                     # Create the same mailbox on the destination server
                     try:
                         self.__log_print(f"Criando a pasta {mailbox_name2} no servidor de destino, caso não exista...")
-                        self.__dst_mail.create(mailbox_name)
-                        self.__dst_mail.select(mailbox_name)
+                        dst_mail.create(mailbox_name)
+                        dst_mail.select(mailbox_name)
                     except imaplib.IMAP4.error as e:
                         self.__log_print(f"\nErro ao tentar criar/selecionar a pasta {mailbox_name2} no servidor de destino.")
                         self.__log_print("\nExcept error: \"{}\"".format(e))
@@ -178,7 +176,7 @@ class SyncImapEmail:
                     for src_msg in src_msgs:
                         # Fetch the message header
                         try:
-                            src_result, src_data = self.__src_mail.fetch(src_msg, "(BODY[HEADER])")
+                            src_result, src_data = src_mail.fetch(src_msg, "(BODY[HEADER])")
                         except imaplib.IMAP4.error as e:
                             self.__log_print(f"Erro ao tentar obter o cabeçalho da mensagem no servidor de origem.")
                             self.__log_print("\nExcept error: \"{}\"".format(e))
@@ -195,10 +193,10 @@ class SyncImapEmail:
                             self.__log_print(f"\nMessage-ID: <{message_id}>")
 
                             # Use the Message-ID to check if the message already exists in the destination mailbox
-                            dst_result, dst_data = self.__dst_mail.search(None, "HEADER Message-ID <{}>".format(message_id))
+                            dst_result, dst_data = dst_mail.search(None, "HEADER Message-ID <{}>".format(message_id))
                             if not dst_data[0]:
                                 # Fetch the source message
-                                src_result, src_data = self.__src_mail.fetch(src_msg, "(RFC822)")
+                                src_result, src_data = src_mail.fetch(src_msg, "(RFC822)")
                                 if src_result == "OK":
                                     # Get the date the original message was received
                                     msg = email.message_from_bytes(src_data[0][1])
@@ -209,7 +207,7 @@ class SyncImapEmail:
                                     # Append the source message to the destination mailbox
                                     try:
                                         self.__log_print(f"Copiando mensagem de {mailbox_name2} para o servidor de destino...")
-                                        dst_result, dst_data = self.__dst_mail.append(mailbox_name, None, received_date, src_data[0][1])
+                                        dst_result, dst_data = dst_mail.append(mailbox_name, None, received_date, src_data[0][1])
                                         if dst_result != "OK":
                                             self.__log_print(f"Erro ao tentar copiar a mensagem de {mailbox_name2} para o servidor de destino.")
                                             self.__log_print(f"dst_result: {dst_result}\ndst_data: {dst_data}")
@@ -226,7 +224,7 @@ class SyncImapEmail:
                             self.__log_print(f"header: {header}")
                 else:
                     self.__log_print(f"A pasta {mailbox_name2} está vazia no servidor de origem.")
-            self.__log_print(f"\nFinalizado a migração do e-mail <{json['src']['user']}>.")
+            return True
         else:
             self.__log_print("\nErro ao tentar obter a lista de pastas no servidor de origem.")
             self.__log_print("\nExcept error: \"{}\"".format(src_mailboxes))
