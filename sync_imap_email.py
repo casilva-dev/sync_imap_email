@@ -176,7 +176,7 @@ class SyncImapEmail:
                     for src_msg in src_msgs:
                         # Fetch the message header
                         try:
-                            src_result, src_data = src_mail.fetch(src_msg, "(BODY[HEADER])")
+                            src_result, src_data = src_mail.fetch(src_msg, "(BODY.PEEK[HEADER])")
                         except imaplib.IMAP4.error as e:
                             self.__log_print(f"Erro ao tentar obter o cabeçalho da mensagem no servidor de origem.")
                             self.__log_print("\nExcept error: \"{}\"".format(e))
@@ -196,7 +196,7 @@ class SyncImapEmail:
                             dst_result, dst_data = dst_mail.search(None, "HEADER Message-ID <{}>".format(message_id))
                             if not dst_data[0]:
                                 # Fetch the source message
-                                src_result, src_data = src_mail.fetch(src_msg, "(RFC822)")
+                                src_result, src_data = src_mail.fetch(src_msg, "BODY.PEEK[]")
                                 if src_result == "OK":
                                     # Get the date the original message was received
                                     msg = email.message_from_bytes(src_data[0][1])
@@ -214,6 +214,12 @@ class SyncImapEmail:
                                     except imaplib.IMAP4.error as e:
                                         self.__log_print(f"Erro ao tentar copiar a mensagem de {mailbox_name2} para o servidor de destino.")
                                         self.__log_print("\nExcept error: \"{}\"".format(e))
+                                    flags = src_mail.fetch(src_msg, "(FLAGS)")[1][0]
+                                    flags = re.findall(r'\\\w+', flags.decode())
+                                    if flags:
+                                        flags = ' '.join(flags)
+                                        dst_data = dst_mail.search(None, 'HEADER Message-ID "{}"'.format(message_id))[1]
+                                        dst_mail.store(dst_data[0].split()[-1], "+FLAGS", flags)
                                 else:
                                     self.__log_print(f"Erro ao tentar buscar a mensagem de {mailbox_name2} do servidor de origem.")
                                     self.__log_print(f"src_result: {src_result}\nsrc_data: {src_data}")
