@@ -96,7 +96,9 @@ class SyncImapEmail:
                     creds.refresh(Request())
                 else:
                     flow = InstalledAppFlow.from_client_secrets_file('oauth_client_secret.json', self.__scopes)
-                    creds = flow.run_local_server(port=0)
+                    prompt_msg = "Visite a URL para autorizar este aplicativo: \n{url}"
+                    code_msg = "Digite o código de autorização: "
+                    creds = flow.run_console(authorization_prompt_message=prompt_msg, authorization_code_message=code_msg)
                 # Save the credentials for the next run
                 with open(f"token_{email}.json", 'w') as token:
                     token.write(creds.to_json())

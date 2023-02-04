@@ -53,7 +53,7 @@ O script pode ser utilizado de duas formas diferentes:
 
     ```bash
     docker build -t sync_imap_email .
-    docker run --name my_container sync_imap_email
+    docker run --name -it my_container sync_imap_email
     ```
 
     O Docker irá iniciar o container para executar o script. Após a conclusão da migração, o nome do arquivo de log será exibido. Copie o arquivo de log do container para o seu computador local.
@@ -72,14 +72,14 @@ O script pode ser utilizado de duas formas diferentes:
     sudo apt-get update
     sudo apt-get install python3.8
     sudo apt-get install python3-pip
-    pip3 install chardet
+    pip3 install chardet google-auth google-auth-oauthlib
     ```
 
     - ***MacOS:***
 
     ```zsh
     brew install python3
-    pip3 install chardet
+    pip3 install chardet google-auth google-auth-oauthlib
     ```
 
     Após a instalação dos pacotes necessários, execute o script:
