@@ -103,6 +103,22 @@ class SyncImapEmail:
                 with open(f"token_{email}.json", 'w') as token:
                     token.write(creds.to_json())
 
+    # Get matching mailbox name from the provided list
+    def __get_mailbox_name(self, search, list_mailbox):
+        mailboxes_defaults = [
+            ["entrada", "inbox"], ["enviados", "sent"], ["rascunhos", "drafts"],
+            ["lixo", "spam"], ["lixeira", "trash"], ["arquivo", "archive"],
+            ["porcaria", "junk"], ["todos os e-mails", "all mail"]
+        ]
+        search_mailbox = search.split(".")[-1].lower()
+        list_mailbox = [mailbox.decode() for mailbox in list_mailbox]
+        for mailbox_default in mailboxes_defaults:
+            if search_mailbox in mailbox_default:
+                for mailbox in list_mailbox:
+                    if any(m in mailbox.lower() for m in mailbox_default):
+                        return mailbox.split('"."')[-1].split('"/"')[-1].strip().strip('"')
+        return search
+
     # Instantiate the IMAP connection class according to the security type
     def __imap_security(self, type, host, port):
         if type == "SSL" or type == "OAUTH2":
@@ -200,116 +216,112 @@ class SyncImapEmail:
     def __migrate(self, src_mail, dst_mail):
         # Get all source mailboxes
         try:
-            self.__log_print("Obtendo a lista de pastas do servidor de origem...")
+            self.__log_print("Obtendo a lista de pastas no servidor de origem...")
             src_mailboxes = src_mail.list()
         except imaplib.IMAP4.error as e:
             self.__log_print("\nErro ao tentar obter a lista de pastas no servidor de origem.")
             self.__log_print("\nExcept error: \"{}\"".format(e))
             return
 
-        if src_mailboxes[0] == "OK":
+        # Get all destination mailboxes
+        try:
+            self.__log_print("Obtendo a lista de pastas no servidor de destino...")
+            dst_mailboxes = dst_mail.list()
+        except imaplib.IMAP4.error as e:
+            self.__log_print("\nErro ao tentar obter a lista de pastas no servidor de destino.")
+            self.__log_print("\nExcept error: \"{}\"".format(e))
+            return
 
-            # Loop through all source mailboxes
-            for mailbox in src_mailboxes[1]:
-                # Get the mailbox name and select it
-                try:
-                    self.__log_print("Obtendo o nome da pasta do servidor de origem...")
-                    mailbox_name = mailbox.split(b'"."')[-1].strip(b'"')
-                    mailbox_name = mailbox_name.decode().strip()
-                except TypeError as e:
-                    self.__log_print("\nErro ao tentar obter o nome da pasta no servidor de origem.")
-                    self.__log_print("\nExcept error: \"{}\"".format(e))
-                    continue
+        # Loop through all source mailboxes
+        for src_mailbox in src_mailboxes[1]:
+            src_mailbox = src_mailbox.decode().split('"."')[-1].split('"/"')[-1].strip().strip('"')
+            try:
+                self.__log_print(f"Selecionando a pasta {src_mailbox} do servidor de origem...")
+                src_mail.select(src_mailbox)
+            except imaplib.IMAP4.error as e:
+                self.__log_print(f"\nErro ao tentar selecionar a pasta {src_mailbox} no servidor de origem.")
+                self.__log_print("\nExcept error: \"{}\"".format(e))
+                continue
 
+            # Get all messages in the source mailbox
+            src_result, src_data = src_mail.search(None, "ALL")
+            if src_data[0]:
+                src_msgs = src_data[0].split(b' ')
+
+                # Create the same mailbox on the destination server
                 try:
-                    self.__log_print(f"Selecionando a pasta {mailbox_name} do servidor de origem...")
-                    src_mail.select(mailbox_name)
+                    dst_mailbox = self.__get_mailbox_name(src_mailbox, dst_mailboxes[1])
+                    dst_result, dst_data = dst_mail.select(dst_mailbox)
+                    if dst_result != "OK":
+                        self.__log_print(f"Criando a pasta {dst_mailbox} no servidor de destino, caso não exista...")
+                        dst_mail.create(dst_mailbox)
+                        dst_mail.select(dst_mailbox)
                 except imaplib.IMAP4.error as e:
-                    self.__log_print(f"\nErro ao tentar selecionar a pasta {mailbox_name} no servidor de origem.")
+                    self.__log_print(f"\nErro ao tentar criar a pasta {dst_mailbox} no servidor de destino.")
                     self.__log_print("\nExcept error: \"{}\"".format(e))
                     continue
 
-                # Get all messages in the source mailbox
-                src_result, src_data = src_mail.search(None, "ALL")
-                if src_data[0]:
-                    src_msgs = src_data[0].split(b' ')
-
-                    # Create the same mailbox on the destination server
+                # Loop through all messages in the source mailbox
+                for src_msg in src_msgs:
+                    # Fetch the message header
                     try:
-                        dst_result, dst_data = dst_mail.select(mailbox_name)
-                        if dst_result != "OK":
-                            self.__log_print(f"Criando a pasta {mailbox_name} no servidor de destino, caso não exista...")
-                            dst_mail.create(mailbox_name)
-                            dst_mail.select(mailbox_name)
+                        src_result, src_data = src_mail.fetch(src_msg, "(BODY.PEEK[HEADER])")
                     except imaplib.IMAP4.error as e:
-                        self.__log_print(f"\nErro ao tentar criar a pasta {mailbox_name} no servidor de destino.")
+                        self.__log_print(f"Erro ao tentar obter o cabeçalho da mensagem no servidor de origem.")
                         self.__log_print("\nExcept error: \"{}\"".format(e))
                         continue
 
-                    # Loop through all messages in the source mailbox
-                    for src_msg in src_msgs:
-                        # Fetch the message header
-                        try:
-                            src_result, src_data = src_mail.fetch(src_msg, "(BODY.PEEK[HEADER])")
-                        except imaplib.IMAP4.error as e:
-                            self.__log_print(f"Erro ao tentar obter o cabeçalho da mensagem no servidor de origem.")
-                            self.__log_print("\nExcept error: \"{}\"".format(e))
-                            continue
+                    # Extract the Message-ID from the header
+                    encoding = chardet.detect(src_data[0][1])['encoding']
+                    header = src_data[0][1].decode(encoding)
+                    pattern = r"message-id:[\r\n\s]*\<?([a-z0-9_.%=+-]+@[a-z0-9_.%=+-]+)\>?"
+                    message_id = re.search(pattern, header.lower(), re.IGNORECASE)
 
-                        # Extract the Message-ID from the header
-                        encoding = chardet.detect(src_data[0][1])['encoding']
-                        header = src_data[0][1].decode(encoding)
-                        pattern = r"message-id:[\r\n\s]*\<?([a-z0-9_.%=+-]+@[a-z0-9_.%=+-]+)\>?"
-                        message_id = re.search(pattern, header.lower(), re.IGNORECASE)
+                    if message_id:
+                        message_id = message_id.group(1)
+                        self.__log_print(f"\nMessage-ID: <{message_id}>")
 
-                        if message_id:
-                            message_id = message_id.group(1)
-                            self.__log_print(f"\nMessage-ID: <{message_id}>")
+                        # Use the Message-ID to check if the message already exists in the destination mailbox
+                        dst_result, dst_data = dst_mail.search(None, "HEADER Message-ID <{}>".format(message_id))
+                        if not dst_data[0]:
+                            # Fetch the source message
+                            src_result, src_data = src_mail.fetch(src_msg, "BODY.PEEK[]")
+                            if src_result == "OK":
+                                # Get the date the original message was received
+                                msg = email.message_from_bytes(src_data[0][1])
+                                received_datetime = parsedate_to_datetime(msg["Date"])
+                                received_timestamp = time.mktime(received_datetime.timetuple())
+                                received_date = imaplib.Time2Internaldate(received_timestamp)
 
-                            # Use the Message-ID to check if the message already exists in the destination mailbox
-                            dst_result, dst_data = dst_mail.search(None, "HEADER Message-ID <{}>".format(message_id))
-                            if not dst_data[0]:
-                                # Fetch the source message
-                                src_result, src_data = src_mail.fetch(src_msg, "BODY.PEEK[]")
-                                if src_result == "OK":
-                                    # Get the date the original message was received
-                                    msg = email.message_from_bytes(src_data[0][1])
-                                    received_datetime = parsedate_to_datetime(msg["Date"])
-                                    received_timestamp = time.mktime(received_datetime.timetuple())
-                                    received_date = imaplib.Time2Internaldate(received_timestamp)
+                                # Append the source message to the destination mailbox
+                                try:
+                                    self.__log_print(f"Copiando mensagem da pasta {src_mailbox} no servidor de origem para a pasta {dst_mailbox} no servidor de destino...")
+                                    dst_result, dst_data = dst_mail.append(dst_mailbox, None, received_date, src_data[0][1])
+                                    if dst_result != "OK":
+                                        self.__log_print(f"Erro ao tentar adicionar a mensagem para a pasta {dst_mailbox} no servidor de destino.")
+                                        self.__log_print(f"dst_result: {dst_result}\ndst_data: {dst_data}")
+                                except imaplib.IMAP4.error as e:
+                                    self.__log_print(f"Erro ao tentar adicionar a mensagem para a pasta {dst_mailbox} no servidor de destino.")
+                                    self.__log_print("\nExcept error: \"{}\"".format(e))
+                                    continue
 
-                                    # Append the source message to the destination mailbox
-                                    try:
-                                        self.__log_print(f"Copiando mensagem de {mailbox_name} para o servidor de destino...")
-                                        dst_result, dst_data = dst_mail.append(mailbox_name, None, received_date, src_data[0][1])
-                                        if dst_result != "OK":
-                                            self.__log_print(f"Erro ao tentar copiar a mensagem de {mailbox_name} para o servidor de destino.")
-                                            self.__log_print(f"dst_result: {dst_result}\ndst_data: {dst_data}")
-                                    except imaplib.IMAP4.error as e:
-                                        self.__log_print(f"Erro ao tentar copiar a mensagem de {mailbox_name} para o servidor de destino.")
-                                        self.__log_print("\nExcept error: \"{}\"".format(e))
-                                        continue
-
-                                    # Preserved original message flags when copying to target email
-                                    flags = src_mail.fetch(src_msg, "(FLAGS)")[1][0]
-                                    flags = re.findall(r'\\\w+', flags.decode())
-                                    if flags:
-                                        flags = ' '.join(flags)
-                                        dst_data = dst_mail.search(None, 'HEADER Message-ID "{}"'.format(message_id))[1]
-                                        dst_mail.store(dst_data[0].split()[-1], "+FLAGS", flags)
-                                else:
-                                    self.__log_print(f"Erro ao tentar buscar a mensagem de {mailbox_name} do servidor de origem.")
-                                    self.__log_print(f"src_result: {src_result}\nsrc_data: {src_data}")
+                                # Preserved original message flags when copying to target email
+                                flags = src_mail.fetch(src_msg, "(FLAGS)")[1][0]
+                                flags = re.findall(r'\\\w+', flags.decode())
+                                if flags:
+                                    flags = ' '.join(flags)
+                                    dst_data = dst_mail.search(None, 'HEADER Message-ID "{}"'.format(message_id))[1]
+                                    dst_mail.store(dst_data[0].split()[-1], "+FLAGS", flags)
                             else:
-                                self.__log_print(f"Mensagem já existe em {mailbox_name} no servidor de destino.")
+                                self.__log_print(f"Erro ao tentar buscar a mensagem na pasta {src_mailbox} no servidor de origem.")
+                                self.__log_print(f"src_result: {src_result}\nsrc_data: {src_data}")
                         else:
-                            self.__log_print("Message-ID não encontrado no cabeçalho.")
-                            self.__log_print(f"header: {header}")
-                else:
-                    self.__log_print(f"A pasta {mailbox_name} está vazia no servidor de origem.")
-        else:
-            self.__log_print("\nErro ao tentar obter a lista de pastas no servidor de origem.")
-            self.__log_print("\nExcept error: \"{}\"".format(src_mailboxes))
+                            self.__log_print(f"Mensagem já existe na pasta {dst_mailbox} no servidor de destino.")
+                    else:
+                        self.__log_print("Message-ID não encontrado no cabeçalho.")
+                        self.__log_print(f"header: {header}")
+            else:
+                self.__log_print(f"A pasta {src_mailbox} está vazia no servidor de origem.")
 
 if __name__ == '__main__':
     SyncImapEmail()
