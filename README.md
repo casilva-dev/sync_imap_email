@@ -27,16 +27,16 @@ Edite o arquivo "credencials.json" e adicione as credenciais dos e-mails:
 [
     {
         "src": {
-            "user": "email@domain1-src.com",
-            "password": "password-src",
-            "server": "imap.domain1-src.com",
+            "email": "email@domain1.com",
+            "password": "password",
+            "server": "imap.domain1.com",
             "port": 143,
             "security": "TLS"
         },
         "dst": {
-            "user": "email@domain1-dst.com",
-            "password": "password-dst",
-            "server": "mail.domain1-dst.com",
+            "email": "email@domain2.com",
+            "password": "password",
+            "server": "mail.domain2.com",
             "port": 993,
             "security": "SSL"
         }

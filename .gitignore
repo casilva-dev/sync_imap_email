@@ -1,2 +1,4 @@
 credentials.json
 log_*.txt
+oauth_client_secret.json
+token_*.json
