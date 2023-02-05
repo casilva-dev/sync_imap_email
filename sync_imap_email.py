@@ -247,7 +247,7 @@ class SyncImapEmail:
             try:
                 src_result, src_data = src_mail.search(None, "ALL")
             except imaplib.IMAP4.error as e:
-                self.__log_print("Pulando para próxima pasta.")
+                self.__log_print(f"Pulando a pasta {src_mailbox}.")
                 continue
             if src_data[0]:
                 src_msgs = src_data[0].split(b' ')
@@ -258,6 +258,7 @@ class SyncImapEmail:
                 elif src_mail.host.find("gmail.com") != -1:
                     dst_mailbox = dst_mailbox.replace("[Gmail]/", "").replace("/", ".")
                     if dst_mailbox.lower().strip('"') in ["all mail", "todos os e-mails", "starred", "com estrela"]:
+                        self.__log_print(f"Pulando a pasta {src_mailbox}.")
                         continue
 
                 # Create the same mailbox on the destination server
@@ -268,8 +269,8 @@ class SyncImapEmail:
                         dst_result, dst_data = dst_mail.select(dst_mailbox)
                     if dst_result != "OK":
                         self.__log_print(f"Criando a pasta {dst_mailbox} no servidor de destino...")
-                        teste1 = dst_mail.create(dst_mailbox)
-                        teste2 = dst_mail.select(dst_mailbox)
+                        dst_mail.create(dst_mailbox)
+                        dst_mail.select(dst_mailbox)
                 except imaplib.IMAP4.error as e:
                     self.__log_print(f"\nErro ao tentar criar a pasta {dst_mailbox} no servidor de destino.")
                     self.__log_print("\nExcept error: \"{}\"".format(e))
