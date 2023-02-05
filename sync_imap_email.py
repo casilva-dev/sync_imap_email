@@ -91,10 +91,10 @@ class SyncImapEmail:
                 creds = Credentials.from_authorized_user_file(f"token_{email}.json", self.__scopes)
             # If there are no (valid) credentials available, let the user log in.
             if not creds or not creds.valid:
-                self.__log_print(f"\nCriando o token OAUTH2 do e-mail: <{data['email']}>\n")
                 if creds and creds.expired and creds.refresh_token:
                     creds.refresh(Request())
                 else:
+                    self.__log_print(f"\nCriando o token OAUTH2 do e-mail: <{data['email']}>\n")
                     flow = InstalledAppFlow.from_client_secrets_file('oauth_client_secret.json', self.__scopes)
                     prompt_msg = "Visite a URL para autorizar este aplicativo: \n{url}"
                     code_msg = "Digite o código de autorização: "
@@ -108,15 +108,15 @@ class SyncImapEmail:
         mailboxes_defaults = [
             ["entrada", "inbox"], ["enviados", "sent"], ["rascunhos", "drafts"],
             ["lixo", "spam"], ["lixeira", "trash"], ["arquivo", "archive"],
-            ["porcaria", "junk"], ["todos os e-mails", "all mail"]
+            ["porcaria", "junk"], ["todos os e-mails", "all mail"], ["com estrela", "starred"]
         ]
-        search_mailbox = search.split(".")[-1].lower()
+        search_mailbox = search.lower().split(".")[-1].split("/")[-1].strip('"')
         list_mailbox = [mailbox.decode() for mailbox in list_mailbox]
         for mailbox_default in mailboxes_defaults:
             if search_mailbox in mailbox_default:
                 for mailbox in list_mailbox:
                     if any(m in mailbox.lower() for m in mailbox_default):
-                        return mailbox.split('"."')[-1].split('"/"')[-1].strip().strip('"')
+                        return mailbox.split('"."')[-1].split('"/"')[-1].strip()
         return search
 
     # Instantiate the IMAP connection class according to the security type
@@ -234,7 +234,7 @@ class SyncImapEmail:
 
         # Loop through all source mailboxes
         for src_mailbox in src_mailboxes[1]:
-            src_mailbox = src_mailbox.decode().split('"."')[-1].split('"/"')[-1].strip().strip('"')
+            src_mailbox = src_mailbox.decode().split('"."')[-1].split('"/"')[-1].strip()
             try:
                 self.__log_print(f"Selecionando a pasta {src_mailbox} do servidor de origem...")
                 src_mail.select(src_mailbox)
@@ -244,18 +244,32 @@ class SyncImapEmail:
                 continue
 
             # Get all messages in the source mailbox
-            src_result, src_data = src_mail.search(None, "ALL")
+            try:
+                src_result, src_data = src_mail.search(None, "ALL")
+            except imaplib.IMAP4.error as e:
+                self.__log_print("Pulando para próxima pasta.")
+                continue
             if src_data[0]:
                 src_msgs = src_data[0].split(b' ')
 
+                dst_mailbox = self.__get_mailbox_name(src_mailbox, dst_mailboxes[1])
+                if dst_mail.host.find("gmail.com") != -1:
+                    dst_mailbox = dst_mailbox.replace("INBOX.", "").replace(".", "/")
+                elif src_mail.host.find("gmail.com") != -1:
+                    dst_mailbox = dst_mailbox.replace("[Gmail]/", "").replace("/", ".")
+                    if dst_mailbox.lower().strip('"') in ["all mail", "todos os e-mails", "starred", "com estrela"]:
+                        continue
+
                 # Create the same mailbox on the destination server
                 try:
-                    dst_mailbox = self.__get_mailbox_name(src_mailbox, dst_mailboxes[1])
                     dst_result, dst_data = dst_mail.select(dst_mailbox)
+                    if dst_result == "NO" and dst_data[0].decode().find("prefixed with: INBOX.") != -1:
+                        dst_mailbox = '"INBOX.{}"'.format(dst_mailbox.strip('"').replace("/", "."))
+                        dst_result, dst_data = dst_mail.select(dst_mailbox)
                     if dst_result != "OK":
-                        self.__log_print(f"Criando a pasta {dst_mailbox} no servidor de destino, caso não exista...")
-                        dst_mail.create(dst_mailbox)
-                        dst_mail.select(dst_mailbox)
+                        self.__log_print(f"Criando a pasta {dst_mailbox} no servidor de destino...")
+                        teste1 = dst_mail.create(dst_mailbox)
+                        teste2 = dst_mail.select(dst_mailbox)
                 except imaplib.IMAP4.error as e:
                     self.__log_print(f"\nErro ao tentar criar a pasta {dst_mailbox} no servidor de destino.")
                     self.__log_print("\nExcept error: \"{}\"".format(e))
