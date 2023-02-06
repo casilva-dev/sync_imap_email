@@ -206,22 +206,44 @@ class SyncImapEmail:
             self.__log_print("\nErro ao tentar obter a lista de pastas no servidor de origem.")
             self.__log_print("\nExcept error: \"{}\"".format(e))
             return
+        src_mailboxes = [src_mailbox.decode() for src_mailbox in src_mailboxes[1]]
+        src_separator = re.search('"(/|.)"', src_mailboxes[0]).group(1)
+
+        # Checks if source mailboxes are prefixed with "INBOX.".
+        src_prefix = "INBOX."
+        for src_mailbox in src_mailboxes:
+            src_mailbox = src_mailbox.split(f'"{src_separator}"')[-1].strip() 
+            if src_mailbox.upper() == "INBOX":
+                continue
+            if src_mailbox.find(src_prefix) == -1:
+                src_prefix = None
+                break
 
         # Get all destination mailboxes
         try:
             self.__log_print("Obtendo a lista de pastas no servidor de destino...")
             dst_mailboxes = dst_mail.list()
-            dst_mailboxes = [dst_mailbox.decode() for dst_mailbox in dst_mailboxes[1]]
         except imaplib.IMAP4.error as e:
             self.__log_print("\nErro ao tentar obter a lista de pastas no servidor de destino.")
             self.__log_print("\nExcept error: \"{}\"".format(e))
             return
+        dst_mailboxes = [dst_mailbox.decode() for dst_mailbox in dst_mailboxes[1]]
+        dst_separator = re.search('"(/|.)"', dst_mailboxes[0]).group(1)
+
+        # Checks if destination mailboxes are prefixed with "INBOX.".
+        dst_prefix = "INBOX."
+        for dst_mailbox in dst_mailboxes:
+            dst_mailbox = dst_mailbox.split(f'"{dst_separator}"')[-1].strip() 
+            if dst_mailbox.upper() == "INBOX":
+                continue
+            if dst_mailbox.find(dst_prefix) == -1:
+                dst_prefix = None
+                break
 
         mailboxes_defaults = ["Sent", "Drafts", "Junk", "Trash", "Archive"]
 
         # Loop through all source mailboxes
-        for src_mailbox in src_mailboxes[1]:
-            src_mailbox = src_mailbox.decode()
+        for src_mailbox in src_mailboxes:
 
             # Mailboxes that are not copied
             if re.search(r"\\[Noselect|All|Flagged]", src_mailbox):
@@ -231,7 +253,6 @@ class SyncImapEmail:
             if mailbox_default:
                 mailbox_default = mailbox_default.group(1)
 
-            src_separator = re.search('"(/|.)"', src_mailbox).group(1)
             src_mailbox = src_mailbox.split(f'"{src_separator}"')[-1].strip()
             try:
                 self.__log_print(f"Selecionando a pasta {src_mailbox} do servidor de origem...")
@@ -246,13 +267,17 @@ class SyncImapEmail:
             if src_data[0]:
                 src_msgs = src_data[0].split(b' ')
 
-                dst_separator = re.search('"(/|.)"', dst_mailboxes[0]).group(1)
                 if mailbox_default:
                     for mailbox in dst_mailboxes:
                         if mailbox.find(f"\\{mailbox_default}") != -1:
                             dst_mailbox = mailbox.split(f'"{dst_separator}"')[-1].strip()
                 else:
                     dst_mailbox = src_mailbox
+                    if dst_mailbox.upper() != "INBOX" and dst_prefix != src_prefix:
+                        if src_prefix:
+                            dst_mailbox = dst_mailbox.replace(src_prefix, "")
+                        else:
+                            dst_mailbox = '"INBOX.{}"'.format(dst_mailbox.strip('"'))
                     if src_separator != dst_separator:
                         dst_mailbox = dst_mailbox.replace(src_separator, dst_separator)
 
@@ -264,9 +289,6 @@ class SyncImapEmail:
                 # Create the same mailbox on the destination server
                 try:
                     dst_result, dst_data = dst_mail.select(dst_mailbox)
-                    if dst_result == "NO" and dst_data[0].decode().find("prefixed with: INBOX.") != -1:
-                        dst_mailbox = '"INBOX.{}"'.format(dst_mailbox.strip('"').replace("/", "."))
-                        dst_result, dst_data = dst_mail.select(dst_mailbox)
                     if dst_result != "OK":
                         self.__log_print(f"Criando a pasta {dst_mailbox} no servidor de destino...")
                         dst_mail.create(dst_mailbox)
