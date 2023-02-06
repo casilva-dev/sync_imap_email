@@ -103,22 +103,6 @@ class SyncImapEmail:
                 with open(f"token_{email}.json", 'w') as token:
                     token.write(creds.to_json())
 
-    # Get matching mailbox name from the provided list
-    def __get_mailbox_name(self, search, list_mailbox):
-        mailboxes_defaults = [
-            ["entrada", "inbox"], ["enviados", "sent"], ["rascunhos", "drafts"],
-            ["lixo", "spam"], ["lixeira", "trash"], ["arquivo", "archive"],
-            ["porcaria", "junk"], ["todos os e-mails", "all mail"], ["com estrela", "starred"]
-        ]
-        search_mailbox = search.lower().split(".")[-1].split("/")[-1].strip('"')
-        list_mailbox = [mailbox.decode() for mailbox in list_mailbox]
-        for mailbox_default in mailboxes_defaults:
-            if search_mailbox in mailbox_default:
-                for mailbox in list_mailbox:
-                    if any(m in mailbox.lower() for m in mailbox_default):
-                        return mailbox.split('"."')[-1].split('"/"')[-1].strip()
-        return search
-
     # Instantiate the IMAP connection class according to the security type
     def __imap_security(self, type, host, port):
         if type == "SSL" or type == "OAUTH2":
@@ -227,14 +211,28 @@ class SyncImapEmail:
         try:
             self.__log_print("Obtendo a lista de pastas no servidor de destino...")
             dst_mailboxes = dst_mail.list()
+            dst_mailboxes = [dst_mailbox.decode() for dst_mailbox in dst_mailboxes[1]]
         except imaplib.IMAP4.error as e:
             self.__log_print("\nErro ao tentar obter a lista de pastas no servidor de destino.")
             self.__log_print("\nExcept error: \"{}\"".format(e))
             return
 
+        mailboxes_defaults = ["Sent", "Drafts", "Junk", "Trash", "Archive"]
+
         # Loop through all source mailboxes
         for src_mailbox in src_mailboxes[1]:
-            src_mailbox = src_mailbox.decode().split('"."')[-1].split('"/"')[-1].strip()
+            src_mailbox = src_mailbox.decode()
+
+            # Mailboxes that are not copied
+            if re.search(r"\\[Noselect|All|Flagged]", src_mailbox):
+                continue
+
+            mailbox_default = re.search(r"\\({})".format("|".join(mailboxes_defaults)), src_mailbox)
+            if mailbox_default:
+                mailbox_default = mailbox_default.group(1)
+
+            src_separator = re.search('"(/|.)"', src_mailbox).group(1)
+            src_mailbox = src_mailbox.split(f'"{src_separator}"')[-1].strip()
             try:
                 self.__log_print(f"Selecionando a pasta {src_mailbox} do servidor de origem...")
                 src_mail.select(src_mailbox)
@@ -244,22 +242,24 @@ class SyncImapEmail:
                 continue
 
             # Get all messages in the source mailbox
-            try:
-                src_result, src_data = src_mail.search(None, "ALL")
-            except imaplib.IMAP4.error as e:
-                self.__log_print(f"Pulando a pasta {src_mailbox}.")
-                continue
+            src_result, src_data = src_mail.search(None, "ALL")
             if src_data[0]:
                 src_msgs = src_data[0].split(b' ')
 
-                dst_mailbox = self.__get_mailbox_name(src_mailbox, dst_mailboxes[1])
-                if dst_mail.host.find("gmail.com") != -1:
-                    dst_mailbox = dst_mailbox.replace("INBOX.", "").replace(".", "/")
-                elif src_mail.host.find("gmail.com") != -1:
-                    dst_mailbox = dst_mailbox.replace("[Gmail]/", "").replace("/", ".")
-                    if dst_mailbox.lower().strip('"') in ["all mail", "todos os e-mails", "starred", "com estrela"]:
-                        self.__log_print(f"Pulando a pasta {src_mailbox}.")
-                        continue
+                dst_separator = re.search('"(/|.)"', dst_mailboxes[0]).group(1)
+                if mailbox_default:
+                    for mailbox in dst_mailboxes:
+                        if mailbox.find(f"\\{mailbox_default}") != -1:
+                            dst_mailbox = mailbox.split(f'"{dst_separator}"')[-1].strip()
+                else:
+                    dst_mailbox = src_mailbox
+                    if src_separator != dst_separator:
+                        dst_mailbox = dst_mailbox.replace(src_separator, dst_separator)
+
+                if dst_separator == "/":
+                    dst_mailbox = dst_mailbox.replace("INBOX/", "")
+                if dst_mailbox.find("[Gmail]") != -1 and dst_mail.host.find("gmail.com") == -1:
+                    dst_mailbox = dst_mailbox.replace("[Gmail]/", "")
 
                 # Create the same mailbox on the destination server
                 try:
@@ -324,6 +324,8 @@ class SyncImapEmail:
                                 flags = src_mail.fetch(src_msg, "(FLAGS)")[1][0]
                                 flags = re.findall(r'\\\w+', flags.decode())
                                 if flags:
+                                    if "\\Recent" in flags:
+                                        flags.remove("\\Recent")
                                     flags = ' '.join(flags)
                                     dst_data = dst_mail.search(None, 'HEADER Message-ID "{}"'.format(message_id))[1]
                                     dst_mail.store(dst_data[0].split()[-1], "+FLAGS", flags)
