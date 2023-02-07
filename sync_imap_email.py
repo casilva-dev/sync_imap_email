@@ -311,7 +311,7 @@ class SyncImapEmail:
                     # Extract the Message-ID from the header
                     encoding = chardet.detect(src_data[0][1])['encoding']
                     header = src_data[0][1].decode(encoding)
-                    pattern = r"message-id:[\r\n\s]*\<?([a-z0-9_.%=+-]+@[a-z0-9_.%=+-]+)\>?"
+                    pattern = r"message-id:[\r\n\s]*\<?([a-z0-9_.%$=+-]+@[a-z0-9_.%$=+-]+)\>?"
                     message_id = re.search(pattern, header.lower(), re.IGNORECASE)
 
                     if message_id:
@@ -344,10 +344,10 @@ class SyncImapEmail:
 
                                 # Preserved original message flags when copying to target email
                                 flags = src_mail.fetch(src_msg, "(FLAGS)")[1][0]
-                                flags = re.findall(r'\\\w+', flags.decode())
+                                flags = re.findall(r'\\\w+', flags.decode().upper())
+                                if "\\RECENT" in flags:
+                                    flags.remove("\\RECENT")
                                 if flags:
-                                    if "\\Recent" in flags:
-                                        flags.remove("\\Recent")
                                     flags = ' '.join(flags)
                                     dst_data = dst_mail.search(None, 'HEADER Message-ID "{}"'.format(message_id))[1]
                                     dst_mail.store(dst_data[0].split()[-1], "+FLAGS", flags)
