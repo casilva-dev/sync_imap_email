@@ -249,7 +249,7 @@ class SyncImapEmail:
             if re.search(r"\\[Noselect|All|Flagged]", src_mailbox):
                 continue
 
-            mailbox_default = re.search(r"\\({})".format("|".join(mailboxes_defaults)), src_mailbox)
+            mailbox_default = re.search(r"[\\|\.]+({})".format("|".join(mailboxes_defaults)), src_mailbox)
             if mailbox_default:
                 mailbox_default = mailbox_default.group(1)
 
@@ -269,7 +269,7 @@ class SyncImapEmail:
 
                 if mailbox_default:
                     for mailbox in dst_mailboxes:
-                        if mailbox.find(f"\\{mailbox_default}") != -1:
+                        if re.search(r"[\\|\.]{}".format(mailbox_default), mailbox):
                             dst_mailbox = mailbox.split(f'"{dst_separator}"')[-1].strip()
                 else:
                     dst_mailbox = src_mailbox
@@ -311,7 +311,7 @@ class SyncImapEmail:
                     # Extract the Message-ID from the header
                     encoding = chardet.detect(src_data[0][1])['encoding']
                     header = src_data[0][1].decode(encoding)
-                    pattern = r"message-id:[\r\n\s]*\<?([a-z0-9_.%$=+-]+@[a-z0-9_.%$=+-]+)\>?"
+                    pattern = r"message-id:[\r\n\s]*\<?([a-z0-9_.%$!#&/*=+-]+@[a-z0-9_.%$!#&/*=+-]+)\>?"
                     message_id = re.search(pattern, header.lower(), re.IGNORECASE)
 
                     if message_id:
@@ -325,10 +325,13 @@ class SyncImapEmail:
                             src_result, src_data = src_mail.fetch(src_msg, "BODY.PEEK[]")
                             if src_result == "OK":
                                 # Get the date the original message was received
-                                msg = email.message_from_bytes(src_data[0][1])
-                                received_datetime = parsedate_to_datetime(msg["Date"])
-                                received_timestamp = time.mktime(received_datetime.timetuple())
-                                received_date = imaplib.Time2Internaldate(received_timestamp)
+                                try:
+                                    msg = email.message_from_bytes(src_data[0][1])
+                                    received_datetime = parsedate_to_datetime(msg["Date"])
+                                    received_timestamp = time.mktime(received_datetime.timetuple())
+                                    received_date = imaplib.Time2Internaldate(received_timestamp)
+                                except TypeError as e:
+                                    received_date = None
 
                                 # Append the source message to the destination mailbox
                                 try:
@@ -350,7 +353,8 @@ class SyncImapEmail:
                                 if flags:
                                     flags = ' '.join(flags)
                                     dst_data = dst_mail.search(None, 'HEADER Message-ID "{}"'.format(message_id))[1]
-                                    dst_mail.store(dst_data[0].split()[-1], "+FLAGS", flags)
+                                    if len(dst_data[0].split()) > 0:
+                                        dst_mail.store(dst_data[0].split()[-1], "+FLAGS", flags)
                             else:
                                 self.__log_print(f"Erro ao tentar buscar a mensagem na pasta {src_mailbox} no servidor de origem.")
                                 self.__log_print(f"src_result: {src_result}\nsrc_data: {src_data}")
