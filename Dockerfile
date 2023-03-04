@@ -2,7 +2,7 @@
 FROM python:3.8
 
 # Install dependency modules
-RUN pip install chardet google-auth google-auth-oauthlib
+RUN pip install chardet google-auth google-auth-oauthlib==0.8.0
 
 # Copy the sync_imap_email.py file from the local machine to the container
 COPY sync_imap_email.py /
