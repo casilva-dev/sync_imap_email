@@ -21,7 +21,7 @@ to another, facilitating the migration of emails from one server/hosting
 to another in a simple way.
 """
 
-import chardet, datetime, email, imaplib, json, os, pprint, re, sys, time, argparse
+import chardet, datetime, email, imaplib, json, os, pprint, re, sys, time, argparse, locale
 
 from email.utils import parsedate_to_datetime
 from google.auth.transport.requests import Request
@@ -32,12 +32,14 @@ class SyncImapEmail:
 
     # Array with all script messages previously defined here.
     __messages = {
+        "lang_found": "The language set is: {} (english United States).",
+        "lang_incomplete": "The translation of the lang/{}.json file is incomplete.",
+        "lang_not_found": "The lang/{}.json file was not found. The default language set is: en_US (English).",
         "migrate_start": "Starting email migration <{}>...",
         "migrate_finish": "Finished email migration <{}>.",
         "migrate_success": "Email(s) migration completed.",
         "check_log": "Check the log file to verify if there were any errors during the migration process.",
         "file_name": "File name: {}",
-        "lang_not_found": "The lang/{}.json file was not found. The default language set is: en-us (English).",
         "cred_not_found": "The credentials.json file was not found.",
         "copy_cred_file": "Copy the credentials.json.default, rename it to credentials.json, and set the credentials.",
         "oauth_not_found": "The oauth_client_secret.json file was not found.",
@@ -95,7 +97,7 @@ class SyncImapEmail:
     # Load command line arguments
     def __load_arguments(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument("-l", "--language")
+        parser.add_argument("-l", "--language", default=locale.getlocale()[0])
         args = parser.parse_args()
         if args.language:
             self.__set_language(args.language)
@@ -113,10 +115,15 @@ class SyncImapEmail:
 
     # Set language and load messages
     def __set_language(self, language):
+        if language == "en_US":
+            return
         try:
             with open(f"lang/{language}.json", "r") as file:
                 messages = json.load(file)
-            self.__messages = messages.copy()
+            messages_old = self.__messages.copy()
+            self.__messages.update(messages)
+            if not set(messages_old.keys()).issubset(set(messages.keys())):
+                self.__log_print("\n" + self.__messages["lang_incomplete"].format(language))
             self.__log_print("\n" + self.__messages["lang_found"].format(language))
         except FileNotFoundError:
             self.__log_print("\n" + self.__messages["lang_not_found"].format(language))

@@ -1,5 +1,7 @@
 {
-    "lang_found": "O idioma definido é: {} (Português Brasileiro).",
+    "lang_found": "O idioma definido é: {} (português Brasileiro).",
+    "lang_incomplete": "A tradução do arquivo lang/{}.json está incompleta.",
+    "lang_not_found": "O arquivo lang/{}.json não foi encontrado. O idioma padrão definido é: en_US (inglês Estados Unidos).",
     "migrate_start": "Iniciando a migração do e-mail <{}>...",
     "migrate_finish": "Finalizado a migração do e-mail <{}>.",
     "migrate_success": "Migração do(s) e-mail(s) finalizado.",
