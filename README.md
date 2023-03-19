@@ -1,27 +1,14 @@
 ![Sync Email Image](https://cdn-icons-png.flaticon.com/128/9197/9197904.png)
 # SyncImapEmail
 
-[![Python 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
+[![Python 3.6](https://img.shields.io/badge/python-3.6-blue.svg)](https://www.python.org/downloads/release/python-360/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-green.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-Este projeto é um script em Python3 que automatiza o processo de migração de mensagens de e-mail. Ele copia todas as mensagens de um determinado e-mail e as cola em outro, facilitando significativamente a tarefa de transferir uma ou mais contas de e-mail de um servidor/hospedagem para outro. Com este script, a migração é realizada de forma rápida, simples e eficiente.
+This project is a Python script that automates the email message migration process. It downloads all messages from each source email and sends them to the destination emails, making the task of migrating multiple email accounts significantly easier.
 
-## Como usar
+## How to use
 
-Baixe o SyncImapEmail no repositório Git:
-
-```bash
-git clone https://gitlab.com/cesarasilva/sync_imap_email.git
-```
-
-Entre na pasta do projeto, copie o arquivo "credentials.json.default" para um novo arquivo chamado "credentials.json".
-
-```bash
-cd sync_imap_email/
-cp credentials.json.default credencials.json
-```
-
-Edite o arquivo "credencials.json" e adicione as credenciais dos e-mails:
+Download SyncImapEmail from the Git repository, create the "credentials.json" file and add the email settings:
 
 ```json
 [
@@ -45,61 +32,74 @@ Edite o arquivo "credencials.json" e adicione as credenciais dos e-mails:
 ]
 ```
 
-O script pode ser utilizado de duas formas diferentes:
+The script can be used in two different ways:
 
 1. **Docker**
 
-    Inicie o Docker, caso não esteja rodando, e execute o seguinte comando:
+    Start Docker, if it is not already running, and run the following command:
 
     ```bash
     docker build -t sync_imap_email .
     docker run -it --name my_container sync_imap_email
     ```
 
-    O Docker irá iniciar o container para executar o script. Após a conclusão da migração, o nome do arquivo de log será exibido. Copie o arquivo de log do container para o seu computador local.
+    Docker will start the container to run the script. After the migration is complete, the log file name will be displayed. Copy the container log file to your local computer.
 
     ```bash
-    docker cp my_container:/log_20230202_030302.txt .
+    docker cp my_container:/log_20230319_190012.txt .
     ```
 
 2. **Manual**
 
-    Para rodar o script manualmente no terminal do seu computador, é necessário instalar o Python3.8 e suas dependências.
+    To run the script manually in your computer's terminal, you need to install Python (version 3.6 or higher) and its dependencies.
 
     - ***Linux:***
 
-    ```bash
-    sudo apt-get update
-    sudo apt-get install python3.8
-    sudo apt-get install python3-pip
-    pip3 install chardet google-auth google-auth-oauthlib==0.8.0
-    ```
+        ```bash
+        sudo apt-get install python3 python3-pip
+        pip3 install google-auth google-auth-oauthlib==0.8.0
+        ```
 
     - ***MacOS:***
 
-    ```zsh
-    brew install python3
-    pip3 install chardet google-auth google-auth-oauthlib==0.8.0
-    ```
+        ```zsh
+        brew install python3
+        pip3 install google-auth google-auth-oauthlib==0.8.0
+        ```
 
-    Após a instalação dos pacotes necessários, execute o script:
+    - ***Windows:***
+
+        To install Python on Windows, you need to download the installer from the [official website](https://www.python.org/downloads/). After installation, open Command Prompt and install dependencies.
+
+        ```cmd
+        pip install google-auth google-auth-oauthlib==0.8.0
+        ```
+
+    After installing the necessary packages, run the script:
 
     ```bash
     python3 sync_imap_email.py
     ```
 
-## Contribuição
+    If an error occurs, make sure you are running the script with Python version 3.6 or higher:
 
-Nós encorajamos a contribuição de todos! Aqui estão as instruções para começar:
+    ```bash
+    python3 --version
+    python --version
+    ```
 
-1. Faça um fork do projeto.
-2. Crie sua branch para a nova funcionalidade (`git checkout -b nova-funcionalidade`).
-3. Commit suas mudanças (`git commit -am 'Adicionando nova funcionalidade'`).
-4. Empurre a branch (`git push origin nova-funcionalidade`).
-5. Crie um novo Pull Request para o projeto principal.
+## Contribution
 
-Por favor, verifique antes de enviar seu pull request que o código segue as diretrizes de codificação do projeto, incluindo os padrões de formatação e testes automatizados.
+We encourage everyone's contribution! Here are instructions to get started:
 
-## Licença
+1. Fork the project.
+2. Create your branch for the new feature (`git checkout -b new-feature`).
+3. Commit your changes (`git commit -am 'Adding new functionality'`).
+4. Push the branch (`git push origin new-feature`).
+5. Create a new Pull Request for the main project.
 
-Este projeto está licenciado sob a licença [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html).
+Please check before submitting your pull request that the code follows the project's coding guidelines, including formatting standards and automated testing.
+
+## License
+
+This project is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html).
