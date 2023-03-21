@@ -18,14 +18,14 @@ Download SyncImapEmail from the Git repository, create the "credentials.json" fi
             "password": "password",
             "server": "imap.domain1.com",
             "port": 143,
-            "security": "TLS"
+            "security": "STARTTLS"
         },
         "dst": {
             "email": "email@domain2.com",
             "password": "password",
             "server": "mail.domain2.com",
             "port": 993,
-            "security": "SSL"
+            "security": "SSL/TLS"
         }
     },
     ...

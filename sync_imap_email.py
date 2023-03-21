@@ -78,7 +78,7 @@ TIMEOUT_RECONN = 30
 TIMEOUT_MAX = 300
 
 # Version script
-VERSION = '1.0.0'
+VERSION = '1.0.1'
 
 class SyncImapEmail:
     """The script copies all messages from one email to another using the IMAP protocol.
@@ -313,19 +313,21 @@ class SyncImapEmail:
         with open(self._log_filename, 'a', encoding = CODE) as file:
             file.write(message + LF)
 
-    def _imap_conn(self, security: str, host: str, port: int):
+    def _imap_conn(self, host: str, port: int, security: str):
         """Connect via IMAP on host and port with some security.
 
-            - security: type of security (TLS, STARTTLS, SSL or OAUTH2);
             - host: IMAP server address;
-            - port: IMAP server port number.
+            - port: IMAP server port number;
+            - security: type of security (STARTTLS, SSL/TLS or OAUTH2).
         """
 
-        if security in ('SSL', 'OAUTH2'):
+        if security and security.upper() in ('SSL', 'TLS', 'SSL/TLS', 'OAUTH2'):
+            port = int(port) if port else imaplib.IMAP4_SSL_PORT
             rtn = imaplib.IMAP4_SSL(host, port)
         else:
+            port = int(port) if port else imaplib.IMAP4_PORT
             rtn = imaplib.IMAP4(host, port)
-            if security == 'STARTTLS':
+            if security and security.upper() == 'STARTTLS':
                 rtn.starttls()
         return rtn
 
@@ -338,10 +340,10 @@ class SyncImapEmail:
         # Connect to IMAP server
         try:
             self._log_print(EMOJI[9] + self._msg['connect_server'])
-            imap = self._imap_conn(cred['security'], cred['server'], cred['port'])
+            imap = self._imap_conn(cred.get('server'), cred.get('port'), cred.get('security'))
         except gaierror:
             self._log_print(LF + EMOJI[11] + self._msg['nodename_serv_error']
-                            .format(cred['server']))
+                            .format(cred.get('server')))
             self._log_print(LF + EMOJI[1] + self._msg['nodename_serv_verify'])
         except ConnectionRefusedError as error:
             self._log_print(LF + EMOJI[11] + self._msg['connect_server_error'])
@@ -354,7 +356,7 @@ class SyncImapEmail:
             return 'NO'
 
         # Authenticate a connection to IMAP server
-        if cred['security'] == 'OAUTH2':
+        if cred.get('security', '').upper() == 'OAUTH2':
             oauth2 = True
             token, token_file = self.generate_token(cred['email'])
             auth_string = f"user={cred['email']}\1auth=Bearer {token}\1\1"
@@ -366,7 +368,7 @@ class SyncImapEmail:
             if oauth2:
                 imap.authenticate('XOAUTH2', lambda x: auth_string)
             else:
-                imap.login(cred['email'], cred['password'])
+                imap.login(cred.get('email'), cred.get('password', ''))
         except imaplib.IMAP4.error as error:
             self._log_print(LF + EMOJI[11] + self._msg['auth_server_error'])
             if self._debug:
@@ -919,12 +921,12 @@ class SyncImapEmail:
     def start(self, credentials: list):
         """Start the migration process.
 
-            - credentials: the complete list of credentials of thesource and destination emails.
+            - credentials: the complete list of credentials of the source and destination emails.
         """
 
         for creds in credentials:
             for cred in creds.items():
-                if cred[1]['security'] == 'OAUTH2':
+                if cred[1].get('security', '').upper() == 'OAUTH2':
                     self.generate_token(cred[1]['email'])
 
         # Check if there are arguments passed on the command line
