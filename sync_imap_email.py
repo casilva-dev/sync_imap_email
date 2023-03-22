@@ -31,6 +31,7 @@ from datetime import datetime
 from locale import getlocale
 from pprint import pprint
 from socket import gaierror
+from ssl import SSLError
 from time import mktime, sleep
 from email import message_from_bytes
 from email.utils import parseaddr, parsedate_to_datetime
@@ -78,7 +79,7 @@ TIMEOUT_RECONN = 30
 TIMEOUT_MAX = 300
 
 # Version script
-VERSION = '1.0.1'
+VERSION = '1.0.2'
 
 class SyncImapEmail:
     """The script copies all messages from one email to another using the IMAP protocol.
@@ -345,7 +346,7 @@ class SyncImapEmail:
             self._log_print(LF + EMOJI[11] + self._msg['nodename_serv_error']
                             .format(cred.get('server')))
             self._log_print(LF + EMOJI[1] + self._msg['nodename_serv_verify'])
-        except ConnectionRefusedError as error:
+        except (ConnectionRefusedError, SSLError) as error:
             self._log_print(LF + EMOJI[11] + self._msg['connect_server_error'])
             if self._debug:
                 self._log_print(LF + EMOJI[3] + self._msg['except_error'].format(error))
